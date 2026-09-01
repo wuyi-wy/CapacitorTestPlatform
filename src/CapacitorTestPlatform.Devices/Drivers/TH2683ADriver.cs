@@ -4,22 +4,36 @@ using CapacitorTestPlatform.Core.Models;
 namespace CapacitorTestPlatform.Devices.Drivers;
 
 /// <summary>
-/// TH2683A 绝缘电阻测试仪驱动
+/// TH2683A 绝缘电阻测试仪驱动，通过 SCPI 指令配置充电/测量参数并采集绝缘电阻数据。
 /// </summary>
 public class TH2683ADriver : DeviceDriverBase
 {
+    /// <summary>设备型号标识</summary>
     public override string ModelName => "TH2683A";
+    /// <summary>设备显示名称</summary>
     public override string DisplayName => "TH2683A 绝缘电阻测试仪";
+    /// <summary>设备分类</summary>
     public override string Category => "绝缘电阻测试仪";
+    /// <summary>默认波特率</summary>
     public override int DefaultBaudRate => 9600;
 
+    /// <summary>可配置参数列表</summary>
     public override List<string> ConfigurableParameters => new()
     {
         "Voltage", "CurrentTime", "CheckTime", "CheckSpeed", "WaitTime", "Mode", "FreeTime"
     };
 
+    /// <summary>
+    /// 初始化 TH2683A 驱动。
+    /// </summary>
+    /// <param name="serialPortService">串口通信服务</param>
     public TH2683ADriver(ISerialPortService serialPortService) : base(serialPortService) { }
 
+    /// <summary>
+    /// 配置 TH2683A 参数，先检查设备状态，再依次设置电压、充电时间、测量时间等。
+    /// </summary>
+    /// <param name="parameters">参数名值对</param>
+    /// <returns>配置是否成功</returns>
     public override async Task<bool> ConfigureAsync(Dictionary<string, string> parameters)
     {
         try
@@ -65,6 +79,10 @@ public class TH2683ADriver : DeviceDriverBase
         }
     }
 
+    /// <summary>
+    /// 执行一次绝缘电阻测量，切换到测量页面后读取 FETC 数据。
+    /// </summary>
+    /// <returns>包含绝缘电阻测量数据的结果</returns>
     public override async Task<DeviceTestResult> MeasureAsync()
     {
         try

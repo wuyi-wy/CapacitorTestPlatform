@@ -7,10 +7,18 @@ using System.Windows.Data;
 
 namespace CapacitorTestPlatform.UI.Views;
 
+/// <summary>
+/// 测试页面，展示测试计划数据表格，支持动态列生成和设备数据导入。
+/// </summary>
 public partial class TestPageView : Page
 {
+    /// <summary>测试页面视图模型</summary>
     private readonly TestPageViewModel _viewModel;
 
+    /// <summary>
+    /// 初始化测试页面，绑定 ViewModel 并注册数据行集合变更事件以刷新列。
+    /// </summary>
+    /// <param name="viewModel">测试页面视图模型实例。</param>
     public TestPageView(TestPageViewModel viewModel)
     {
         InitializeComponent();
@@ -24,6 +32,9 @@ public partial class TestPageView : Page
         };
     }
 
+    /// <summary>
+    /// 响应设备选择请求，打开设备面板弹窗，导入采集数据。
+    /// </summary>
     private void OnRequestDeviceSelect(object? sender, EventArgs e)
     {
         var app = (App)Application.Current;
@@ -39,6 +50,9 @@ public partial class TestPageView : Page
         }
     }
 
+    /// <summary>
+    /// 根据当前列信息动态重建 DataGrid 的列定义（序号列 + 数据列 + 删除按钮列）。
+    /// </summary>
     private void UpdateTestColumns()
     {
         var columns = TestDataRow.GetColumnOrder();

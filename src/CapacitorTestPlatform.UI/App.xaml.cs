@@ -12,12 +12,20 @@ using System.Windows;
 
 namespace CapacitorTestPlatform.UI;
 
+/// <summary>
+/// WPF 应用入口，负责依赖注入注册和启动主窗口。
+/// </summary>
 public partial class App : Application
 {
+    /// <summary>DI 容器</summary>
     private ServiceProvider? _serviceProvider;
 
+    /// <summary>全局服务提供者，供视图获取注入的服务实例。</summary>
     public IServiceProvider ServiceProvider => _serviceProvider!;
 
+    /// <summary>
+    /// 应用启动时注册所有服务、仓储和 ViewModel，并显示主窗口。
+    /// </summary>
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -72,6 +80,9 @@ public partial class App : Application
         mainWindow.Show();
     }
 
+    /// <summary>
+    /// 应用退出时释放 DI 容器资源。
+    /// </summary>
     protected override void OnExit(ExitEventArgs e)
     {
         _serviceProvider?.Dispose();

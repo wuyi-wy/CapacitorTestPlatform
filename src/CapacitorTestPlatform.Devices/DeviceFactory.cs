@@ -4,11 +4,20 @@ using CapacitorTestPlatform.Devices.Drivers;
 
 namespace CapacitorTestPlatform.Devices;
 
+/// <summary>
+/// 设备工厂，根据设备型号创建对应的驱动实例，并提供设备列表查询。
+/// </summary>
 public class DeviceFactory : IDeviceFactory
 {
+    /// <summary>串口通信服务</summary>
     private readonly ISerialPortService _serialPortService;
+    /// <summary>设备型号 → 驱动创建函数的映射字典</summary>
     private readonly Dictionary<string, Func<IDeviceDriver>> _driverFactories;
 
+    /// <summary>
+    /// 初始化设备工厂，注册所有支持的设备驱动。
+    /// </summary>
+    /// <param name="serialPortService">串口通信服务</param>
     public DeviceFactory(ISerialPortService serialPortService)
     {
         _serialPortService = serialPortService;
@@ -24,11 +33,20 @@ public class DeviceFactory : IDeviceFactory
         };
     }
 
+    /// <summary>
+    /// 根据设备型号创建对应的驱动实例。
+    /// </summary>
+    /// <param name="deviceModel">设备型号（如 TH2689、MOCK 等）</param>
+    /// <returns>驱动实例，未匹配时返回 null</returns>
     public IDeviceDriver? Create(string deviceModel)
     {
         return _driverFactories.TryGetValue(deviceModel, out var factory) ? factory() : null;
     }
 
+    /// <summary>
+    /// 获取所有支持的设备信息列表。
+    /// </summary>
+    /// <returns>设备信息列表</returns>
     public List<DeviceInfo> GetAllDevices()
     {
         return new List<DeviceInfo>
@@ -43,6 +61,11 @@ public class DeviceFactory : IDeviceFactory
         };
     }
 
+    /// <summary>
+    /// 按设备分类筛选设备列表。
+    /// </summary>
+    /// <param name="category">设备分类名称</param>
+    /// <returns>匹配分类的设备信息列表</returns>
     public List<DeviceInfo> GetDevicesByCategory(string category)
     {
         return GetAllDevices().Where(d => d.Category == category).ToList();

@@ -3,29 +3,54 @@ using CapacitorTestPlatform.Core.Models;
 
 namespace CapacitorTestPlatform.Devices.Drivers;
 
+/// <summary>
+/// Mock 驱动，开发调试用，模拟设备测量结果，无需真实硬件。
+/// </summary>
 public class MockDriver : DeviceDriverBase
 {
+    /// <summary>随机数生成器，用于产生模拟数据</summary>
     private readonly Random _random = new();
+    /// <summary>当前配置的参数</summary>
     private Dictionary<string, string> _currentParams = new();
+    /// <summary>设备分类，决定返回哪类模拟数据</summary>
     private string _deviceCategory = "LCR";
 
+    /// <summary>设备型号标识</summary>
     public override string ModelName => "MOCK";
+    /// <summary>设备显示名称</summary>
     public override string DisplayName => "模拟设备";
+    /// <summary>设备分类</summary>
     public override string Category => _deviceCategory;
+    /// <summary>默认波特率</summary>
     public override int DefaultBaudRate => 9600;
 
+    /// <summary>可配置参数列表</summary>
     public override List<string> ConfigurableParameters => new()
     {
         "Function", "Frequency", "Voltage", "Speed", "Range"
     };
 
+    /// <summary>
+    /// 初始化 Mock 驱动。
+    /// </summary>
+    /// <param name="serialPortService">串口通信服务</param>
     public MockDriver(ISerialPortService serialPortService) : base(serialPortService) { }
 
+    /// <summary>
+    /// 设置模拟设备分类，影响 MeasureAsync 返回的数据结构。
+    /// </summary>
+    /// <param name="category">设备分类（如 LCR、漏电流测试仪、绝缘电阻测试仪、极壳耐压）</param>
     public void SetDeviceCategory(string category)
     {
         _deviceCategory = category;
     }
 
+    /// <summary>
+    /// 模拟连接设备，延迟后返回成功。
+    /// </summary>
+    /// <param name="portName">端口名称</param>
+    /// <param name="baudRate">波特率</param>
+    /// <returns>始终返回 true</returns>
     public override async Task<bool> ConnectAsync(string portName, int? baudRate = null)
     {
         await Task.Delay(200);
@@ -34,6 +59,9 @@ public class MockDriver : DeviceDriverBase
         return true;
     }
 
+    /// <summary>
+    /// 模拟断开设备连接。
+    /// </summary>
     public override async Task DisconnectAsync()
     {
         await Task.Delay(100);
@@ -41,6 +69,11 @@ public class MockDriver : DeviceDriverBase
         Notify("模拟设备已断开");
     }
 
+    /// <summary>
+    /// 模拟配置设备参数，保存参数字典备用。
+    /// </summary>
+    /// <param name="parameters">参数名值对</param>
+    /// <returns>始终返回 true</returns>
     public override async Task<bool> ConfigureAsync(Dictionary<string, string> parameters)
     {
         await Task.Delay(100);
@@ -49,6 +82,10 @@ public class MockDriver : DeviceDriverBase
         return true;
     }
 
+    /// <summary>
+    /// 模拟一次测量，根据设备分类返回对应的随机测试数据。
+    /// </summary>
+    /// <returns>包含随机模拟数据的测量结果</returns>
     public override async Task<DeviceTestResult> MeasureAsync()
     {
         await Task.Delay(300 + _random.Next(200));

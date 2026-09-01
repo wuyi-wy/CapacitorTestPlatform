@@ -6,41 +6,58 @@ using System.Collections.ObjectModel;
 
 namespace CapacitorTestPlatform.UI.ViewModels;
 
+/// <summary>
+/// 计划导入 ViewModel，负责从远程数据库加载检测计划、筛选搜索并跳转到测试页面。
+/// </summary>
 public partial class PlanImportViewModel : ObservableObject
 {
     private readonly IPlanService _planService;
 
+    /// <summary>计划列表数据源</summary>
     [ObservableProperty]
     private ObservableCollection<PlanInfo> _plans = new();
 
+    /// <summary>当前选中的计划</summary>
     [ObservableProperty]
     private PlanInfo? _selectedPlan;
 
+    /// <summary>计划搜索关键字</summary>
     [ObservableProperty]
     private string _searchKeyword = "";
 
+    /// <summary>当前选中的工站</summary>
     [ObservableProperty]
     private string? _selectedStation;
 
+    /// <summary>是否正在加载数据</summary>
     [ObservableProperty]
     private bool _isLoading;
 
+    /// <summary>状态栏提示消息</summary>
     [ObservableProperty]
     private string _statusMessage = "就绪";
 
+    /// <summary>可选工站列表</summary>
     public ObservableCollection<string> Stations { get; } = new()
     {
         "电容性能台1#", "电容性能台2#", "电容性能台3#"
     };
 
+    /// <summary>导航到测试页面时触发的事件</summary>
     public event EventHandler<PlanInfo>? NavigateToTest;
 
+    /// <summary>
+    /// 初始化计划导入 ViewModel，注入计划服务并设置默认工站。
+    /// </summary>
     public PlanImportViewModel(IPlanService planService)
     {
         _planService = planService;
         SelectedStation = "电容性能台1#";
     }
 
+    /// <summary>
+    /// 加载计划命令，从远程服务获取计划列表，失败时回退到模拟数据。
+    /// </summary>
     [RelayCommand]
     private async Task LoadPlansAsync()
     {
@@ -75,6 +92,9 @@ public partial class PlanImportViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// 加载模拟计划数据，用于远程数据库不可用时的演示和开发。
+    /// </summary>
     private void LoadMockPlans()
     {
         Plans.Clear();
@@ -95,6 +115,9 @@ public partial class PlanImportViewModel : ObservableObject
             Plans.Add(plan);
     }
 
+    /// <summary>
+    /// 搜索命令，按关键字过滤计划列表，无匹配时回退到模拟数据筛选。
+    /// </summary>
     [RelayCommand]
     private void Search()
     {
@@ -121,6 +144,10 @@ public partial class PlanImportViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// 跳转到测试页面命令，将选中的计划传递给测试页面。
+    /// </summary>
+    /// <param name="plan">要进行测试的计划信息</param>
     [RelayCommand]
     private void GoToTest(PlanInfo? plan)
     {

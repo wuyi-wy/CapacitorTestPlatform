@@ -4,22 +4,36 @@ using CapacitorTestPlatform.Core.Models;
 namespace CapacitorTestPlatform.Devices.Drivers;
 
 /// <summary>
-/// TH2810B+ LCR数字电桥驱动
+/// TH2810B+ LCR 数字电桥驱动，支持电压/量程/速度配置及列表频率/电压扫描模式。
 /// </summary>
 public class TH2810BDriver : DeviceDriverBase
 {
+    /// <summary>设备型号标识</summary>
     public override string ModelName => "TH2810B";
+    /// <summary>设备显示名称</summary>
     public override string DisplayName => "TH2810B+ LCR数字电桥";
+    /// <summary>设备分类</summary>
     public override string Category => "LCR数字电桥";
+    /// <summary>默认波特率</summary>
     public override int DefaultBaudRate => 19200;
 
+    /// <summary>可配置参数列表</summary>
     public override List<string> ConfigurableParameters => new()
     {
         "Function", "Frequency", "Voltage", "Range", "Speed", "ListFrequency", "ListVoltage", "Mode"
     };
 
+    /// <summary>
+    /// 初始化 TH2810B 驱动。
+    /// </summary>
+    /// <param name="serialPortService">串口通信服务</param>
     public TH2810BDriver(ISerialPortService serialPortService) : base(serialPortService) { }
 
+    /// <summary>
+    /// 配置 TH2810B+ 参数，设置测量功能、频率、电压、量程、速度，支持列表扫描模式。
+    /// </summary>
+    /// <param name="parameters">参数名值对</param>
+    /// <returns>配置是否成功</returns>
     public override async Task<bool> ConfigureAsync(Dictionary<string, string> parameters)
     {
         try
@@ -80,6 +94,10 @@ public class TH2810BDriver : DeviceDriverBase
         }
     }
 
+    /// <summary>
+    /// 执行一次电容测量，触发后读取 FETC? 数据，按每 5 个一组解析并转换单位。
+    /// </summary>
+    /// <returns>包含电容和频率测量数据的结果</returns>
     public override async Task<DeviceTestResult> MeasureAsync()
     {
         try

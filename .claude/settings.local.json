@@ -16,7 +16,9 @@
       "Bash(del \"D:\\\\claude\\\\xinyuan\\\\CapacitorTestPlatform\\\\src\\\\CapacitorTestPlatform.UI\\\\Views\\\\DeviceSelectDialog.xaml\")",
       "Bash(cmd.exe /c \"del /f \\\\\"D:\\\\claude\\\\xinyuan\\\\CapacitorTestPlatform\\\\src\\\\CapacitorTestPlatform.UI\\\\Views\\\\DeviceSelectDialog.xaml\\\\\"\")",
       "Bash(dotnet run *)",
-      "Bash(taskkill //F //IM CapacitorTestPlatform.UI.exe)"
+      "Bash(taskkill //F //IM CapacitorTestPlatform.UI.exe)",
+      "Bash(dotnet clean *)",
+      "Bash(taskkill //F //PID 28136)"
     ]
   }
 }

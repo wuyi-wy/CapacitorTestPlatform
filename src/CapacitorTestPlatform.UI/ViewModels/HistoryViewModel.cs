@@ -7,46 +7,64 @@ using Microsoft.Win32;
 
 namespace CapacitorTestPlatform.UI.ViewModels;
 
+/// <summary>
+/// 历史记录 ViewModel，负责查询、展示、删除和导出检测历史数据。
+/// </summary>
 public partial class HistoryViewModel : ObservableObject
 {
     private readonly ITestService _testService;
     private readonly IReportService _reportService;
 
+    /// <summary>检测记录列表</summary>
     [ObservableProperty]
     private ObservableCollection<TestRecord> _records = new();
 
+    /// <summary>当前选中的记录</summary>
     [ObservableProperty]
     private TestRecord? _selectedRecord;
 
+    /// <summary>按计划编号筛选</summary>
     [ObservableProperty]
     private string _filterPlanNo = "";
 
+    /// <summary>按设备类型筛选</summary>
     [ObservableProperty]
     private string? _filterDeviceType;
 
+    /// <summary>筛选起始日期</summary>
     [ObservableProperty]
     private DateTime? _filterDateFrom;
 
+    /// <summary>筛选截止日期</summary>
     [ObservableProperty]
     private DateTime? _filterDateTo;
 
+    /// <summary>状态栏提示消息</summary>
     [ObservableProperty]
     private string _statusMessage = "就绪";
 
+    /// <summary>是否正在加载数据</summary>
     [ObservableProperty]
     private bool _isLoading;
 
+    /// <summary>可选设备类型列表（含空值"全部"选项）</summary>
     public ObservableCollection<string> DeviceTypes { get; } = new()
     {
         "", "TH2689", "TH2683A", "TH2817A", "TH2832", "TH9201", "TH2810B", "MOCK"
     };
 
+    /// <summary>
+    /// 初始化历史记录 ViewModel，注入测试服务和报告服务。
+    /// </summary>
     public HistoryViewModel(ITestService testService, IReportService reportService)
     {
         _testService = testService;
         _reportService = reportService;
     }
 
+    /// <summary>
+    /// 加载记录命令，根据筛选条件查询检测历史，数据库为空时回退到模拟数据。
+    /// </summary>
     [RelayCommand]
     private async Task LoadRecordsAsync()
     {
@@ -82,6 +100,9 @@ public partial class HistoryViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// 加载模拟检测记录，用于数据库不可用时的演示和开发。
+    /// </summary>
     private void LoadMockRecords()
     {
         Records.Clear();
@@ -100,6 +121,9 @@ public partial class HistoryViewModel : ObservableObject
             Records.Add(r);
     }
 
+    /// <summary>
+    /// 上传命令，将当前筛选条件下的检测记录异步上传到远程数据库。
+    /// </summary>
     [RelayCommand]
     private async Task UploadAsync()
     {
@@ -114,6 +138,10 @@ public partial class HistoryViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// 删除指定的检测记录。
+    /// </summary>
+    /// <param name="record">要删除的检测记录</param>
     [RelayCommand]
     private void DeleteRecord(TestRecord? record)
     {
@@ -122,6 +150,9 @@ public partial class HistoryViewModel : ObservableObject
         StatusMessage = $"已删除记录 #{record.Id}";
     }
 
+    /// <summary>
+    /// 导出 Excel 命令，将当前记录列表导出为 .xlsx 文件。
+    /// </summary>
     [RelayCommand]
     private async Task ExportExcelAsync()
     {

@@ -2,6 +2,9 @@ using CapacitorTestPlatform.Core.Models;
 
 namespace CapacitorTestPlatform.Core.Interfaces;
 
+/// <summary>
+/// 检测数据仓储接口（异步版本，当前未被使用，实际仓储 TestRecordRepository 为同步实现）。
+/// </summary>
 public interface ITestRecordRepository
 {
     Task<IEnumerable<TestRecord>> GetAllAsync();

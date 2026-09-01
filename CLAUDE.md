@@ -100,11 +100,14 @@ CapacitorTestPlatform.sln
 
 ## 本地数据库表
 
-- `TBL_CHECKDATA` — 主存储表（PLAN_CODE, LOT, DEVICE_ID, DEVICE_TYPE, CHECK_NAME, CHECK_VALUE, RESULT, TEST_DT…）
-- `TBL_CHECKPROJECT` — 检测项目表
-- `TBL_PRODUCTS` — 产品信息表
+4 张本地 SQLite 表，表名和字段均采用 PascalCase 命名规范：
 
-远程同步使用 `SqlServerContext`（ReadConn / WriteConn 双连接串）。
+- `CheckData` — 检测数据主表（PlanNo, Lot, DeviceId, DeviceType, CheckName, CheckValue, Result, TestTime, SyncStatus…）
+- `PlanCache` — 远程计划本地缓存（PlanNo, Lot, Station, DeviceId, ItemNo, SpecName, SpecMin, SpecMax, SpecUnit, CreateTime）
+- `DeviceConfig` — 设备参数配置（DeviceType, ParamName, ParamValue, UpdateTime）
+- `ConnectionLog` — 串口连接日志（DeviceType, Port, BaudRate, Status, Message, LogTime）
+
+远程同步使用 `SqlServerContext`（ReadConn / WriteConn 双连接串），远程表名和字段名保持原样不修改。
 
 ---
 
