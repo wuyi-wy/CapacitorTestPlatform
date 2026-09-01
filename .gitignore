@@ -1,0 +1,61 @@
+# Visual Studio / Rider 生成文件
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.cache
+*.suo.cache
+*.vspscc
+*.vssscc
+
+# 编译输出
+bin/
+obj/
+Debug/
+Release/
+AnyCPU/
+x64/
+x86/
+
+# 生成的中间文件
+*.pdb
+*.log
+*.cache
+*.manifest
+*.res
+*.resources
+
+# WPF 特有
+*.g.cs
+*.g.i.cs
+*.baml
+*.xaml.g.cs
+
+# NuGet 包
+packages/
+.idea/
+.omnisharp/
+
+# 本地调试配置
+appsettings.json
+appsettings.Development.json
+appsettings.Local.json
+
+# Windows 临时文件
+Thumbs.db
+desktop.ini
+
+# 编译缓存
+.idea/
+.resharper/
+ReSharper*
+
+# 打包发布输出
+publish/
+dist/
+build/
+
+# 日志
+*.tmp
+*.bak

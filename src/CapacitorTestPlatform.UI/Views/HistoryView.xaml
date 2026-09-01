@@ -1,0 +1,73 @@
+<Page x:Class="CapacitorTestPlatform.UI.Views.HistoryView"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:hc="https://handyorg.github.io/handycontrol"
+      Background="#F5F6FA">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="历史数据" FontSize="24" FontWeight="Bold" Foreground="#2C3E50" Margin="0,0,0,15"/>
+
+        <!-- Filter Bar -->
+        <hc:Card Grid.Row="1" Margin="0,0,0,15" Padding="12">
+            <WrapPanel VerticalAlignment="Center">
+                <TextBlock Text="计划号:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                <TextBox Width="130" Text="{Binding FilterPlanNo, UpdateSourceTrigger=PropertyChanged}"
+                         hc:InfoElement.Placeholder="计划号" Margin="0,0,12,0"/>
+
+                <TextBlock Text="设备类型:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                <ComboBox Width="120" ItemsSource="{Binding DeviceTypes}"
+                          SelectedItem="{Binding FilterDeviceType}" Margin="0,0,12,0"/>
+
+                <TextBlock Text="从:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                <DatePicker Width="130" SelectedDate="{Binding FilterDateFrom}" Margin="0,0,12,0"/>
+
+                <TextBlock Text="到:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                <DatePicker Width="130" SelectedDate="{Binding FilterDateTo}" Margin="0,0,15,0"/>
+
+                <Button Content="查询" Command="{Binding LoadRecordsCommand}"
+                        Style="{StaticResource BtnPrimary}" Padding="18,6" Margin="0,0,10,0"/>
+                <Button Content="导出Excel" Command="{Binding ExportExcelCommand}"
+                        Style="{StaticResource BtnSuccess}" Padding="18,6"/>
+            </WrapPanel>
+        </hc:Card>
+
+        <!-- Data Grid -->
+        <hc:Card Grid.Row="2">
+            <DataGrid ItemsSource="{Binding Records}" SelectedItem="{Binding SelectedRecord}"
+                      AutoGenerateColumns="False" IsReadOnly="True"
+                      CanUserAddRows="False" CanUserDeleteRows="False"
+                      SelectionMode="Single" AlternatingRowBackground="#F8F9FA"
+                      GridLinesVisibility="Horizontal" BorderThickness="0">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="50"/>
+                    <DataGridTextColumn Header="计划号" Binding="{Binding PlanNo}" Width="120"/>
+                    <DataGridTextColumn Header="设备类型" Binding="{Binding DeviceType}" Width="100"/>
+                    <DataGridTextColumn Header="参数名" Binding="{Binding SpecName}" Width="140"/>
+                    <DataGridTextColumn Header="测量值" Binding="{Binding CheckValue}" Width="120"/>
+                    <DataGridTextColumn Header="结果" Binding="{Binding Result}" Width="70"/>
+                    <DataGridTextColumn Header="测试时间" Binding="{Binding TestTime}" Width="150"/>
+                    <DataGridTextColumn Header="操作员" Binding="{Binding Operator}" Width="80"/>
+                    <DataGridTemplateColumn Header="操作" Width="100">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Button Content="删除"
+                                        Command="{Binding DataContext.DeleteRecordCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                        CommandParameter="{Binding}"
+                                        Foreground="Red" Background="Transparent" BorderThickness="0" Padding="8,2"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+        </hc:Card>
+
+        <TextBlock Grid.Row="2" Text="{Binding StatusMessage}" VerticalAlignment="Bottom"
+                   Foreground="#7F8C8D" FontSize="12" Margin="5"/>
+    </Grid>
+</Page>

@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet --version)",
+      "Bash(dotnet new *)",
+      "Bash(dotnet sln *)",
+      "Bash(rm -f CapacitorTestPlatform.Core/Class1.cs)",
+      "Bash(rm -f CapacitorTestPlatform.Data/Class1.cs)",
+      "Bash(rm -f CapacitorTestPlatform.Services/Class1.cs)",
+      "Bash(rm -f CapacitorTestPlatform.Devices/Class1.cs)",
+      "Bash(mkdir -p ../docs)",
+      "Bash(dotnet build *)",
+      "Bash(taskkill //PID 40880 //F)",
+      "Bash(taskkill //PID 44448 //F)",
+      "Bash(taskkill //PID 47652 //F)",
+      "Bash(del \"D:\\\\claude\\\\xinyuan\\\\CapacitorTestPlatform\\\\src\\\\CapacitorTestPlatform.UI\\\\Views\\\\DeviceSelectDialog.xaml\")",
+      "Bash(cmd.exe /c \"del /f \\\\\"D:\\\\claude\\\\xinyuan\\\\CapacitorTestPlatform\\\\src\\\\CapacitorTestPlatform.UI\\\\Views\\\\DeviceSelectDialog.xaml\\\\\"\")",
+      "Bash(dotnet run *)",
+      "Bash(taskkill //F //IM CapacitorTestPlatform.UI.exe)"
+    ]
+  }
+}

@@ -1,0 +1,186 @@
+<Window x:Class="CapacitorTestPlatform.UI.Views.DevicePanelWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:hc="https://handyorg.github.io/handycontrol"
+        xmlns:local="clr-namespace:CapacitorTestPlatform.UI.Views"
+        Title="设备采集" Height="700" Width="1000"
+        WindowStartupLocation="CenterOwner" Background="#F5F6FA">
+
+    <Window.Resources>
+        <DataTemplate x:Key="ComboBoxParamTemplate">
+            <StackPanel Margin="0,0,15,10">
+                <TextBlock FontSize="12" Margin="0,0,0,3">
+                    <Run Text="{Binding DisplayName, Mode=OneWay}"/>
+                    <Run Text="{Binding Unit, Mode=OneWay}" Foreground="#999" FontStyle="Italic"/>
+                </TextBlock>
+                <ComboBox Width="150"
+                          ItemsSource="{Binding Options, Mode=OneWay}"
+                          SelectedItem="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                          FontSize="13"/>
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate x:Key="TextBoxParamTemplate">
+            <StackPanel Margin="0,0,15,10">
+                <TextBlock FontSize="12" Margin="0,0,0,3">
+                    <Run Text="{Binding DisplayName, Mode=OneWay}"/>
+                    <Run Text="{Binding Unit, Mode=OneWay}" Foreground="#999" FontStyle="Italic"/>
+                </TextBlock>
+                <TextBox Width="150"
+                         Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                         FontSize="13"/>
+            </StackPanel>
+        </DataTemplate>
+
+        <local:ParameterTemplateSelector x:Key="ParamSelector"
+            ComboBoxTemplate="{StaticResource ComboBoxParamTemplate}"
+            TextBoxTemplate="{StaticResource TextBoxParamTemplate}"/>
+    </Window.Resources>
+
+    <Grid Margin="15">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="200"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Left: Device List -->
+        <hc:Card Grid.Column="0" Grid.RowSpan="2" Margin="0,0,10,0" Padding="10">
+            <StackPanel>
+                <TextBlock Text="设备列表" FontSize="16" FontWeight="Bold" Margin="0,0,0,10"/>
+                <ListBox ItemsSource="{Binding DeviceProfiles}"
+                         SelectedItem="{Binding SelectedProfile}"
+                         BorderThickness="0" Background="Transparent"
+                         MaxHeight="500">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="5,4">
+                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="13"/>
+                                <TextBlock Text="{Binding Category}" Foreground="#999" FontSize="11"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </StackPanel>
+        </hc:Card>
+
+        <!-- Right: Main content -->
+        <Grid Grid.Column="1" Grid.Row="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Connection Bar -->
+            <hc:Card Grid.Row="0" Margin="0,0,0,10" Padding="12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Ellipse Width="10" Height="10" Fill="{Binding StatusColor, Converter={StaticResource StringToBrushConverter}}" Margin="0,0,8,0"/>
+                        <TextBlock Text="{Binding ConnectionStatus}" VerticalAlignment="Center" Margin="0,0,15,0" FontWeight="Bold"/>
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="1" Text="串口:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                    <ComboBox Grid.Column="2" Width="100" ItemsSource="{Binding AvailablePorts}"
+                              SelectedItem="{Binding SelectedPort}" Margin="0,0,10,0"/>
+                    <ComboBox Grid.Column="3" Width="90" ItemsSource="{Binding BaudRates}"
+                              SelectedItem="{Binding SelectedBaudRate}" Margin="0,0,10,0"/>
+                    <Button Grid.Column="4" Content="刷新" Command="{Binding RefreshPortsCommand}"
+                            Padding="10,5" Margin="0,0,10,0"/>
+
+                    <StackPanel Grid.Column="6" Orientation="Horizontal">
+                        <Button Content="连接" Command="{Binding ConnectCommand}"
+                                Style="{StaticResource BtnPrimary}" Padding="18,6" Margin="0,0,8,0"/>
+                        <Button Content="断开" Command="{Binding DisconnectCommand}"
+                                Style="{StaticResource BtnWarning}" Padding="18,6"/>
+                    </StackPanel>
+                </Grid>
+            </hc:Card>
+
+            <!-- Error Message -->
+            <TextBlock Grid.Row="1" Text="{Binding ErrorMessage}" Foreground="#F44336"
+                       FontWeight="Bold" FontSize="13" Margin="5,0,0,8"
+                       Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibilityConverter}}"/>
+
+            <!-- Parameter Config -->
+            <hc:Card Grid.Row="2" Margin="0,0,0,10" Padding="12">
+                <StackPanel>
+                    <TextBlock Text="参数配置" FontSize="14" FontWeight="Bold" Margin="0,0,0,8"/>
+
+                    <ItemsControl ItemsSource="{Binding Parameters}"
+                                  ItemTemplateSelector="{StaticResource ParamSelector}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+
+                    <WrapPanel Margin="0,10,0,0">
+                        <Button Content="配置参数" Command="{Binding ConfigureCommand}"
+                                Style="{StaticResource BtnPrimary}" Padding="18,6" Margin="0,0,10,0"/>
+                        <TextBlock Text="采集次数:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                        <TextBox Text="{Binding AcquireCount, UpdateSourceTrigger=PropertyChanged}"
+                                 Width="50" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <Button Content="采集数据" Command="{Binding MeasureCommand}"
+                                Style="{StaticResource BtnSuccess}" Padding="18,6"/>
+                    </WrapPanel>
+                </StackPanel>
+            </hc:Card>
+
+            <!-- Result Data Grid -->
+            <hc:Card Grid.Row="3" Margin="0,0,0,10">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="8,8,8,5">
+                        <TextBlock Text="采集结果" FontSize="14" FontWeight="Bold" VerticalAlignment="Center"/>
+                        <Button Content="清空" Command="{Binding ClearResultsCommand}"
+                                Padding="10,3" Margin="15,0,0,0" FontSize="12"/>
+                    </StackPanel>
+                    <DataGrid x:Name="ResultDataGrid" Grid.Row="1"
+                              ItemsSource="{Binding ResultRows}"
+                              AutoGenerateColumns="False" IsReadOnly="False"
+                              CanUserAddRows="False" CanUserDeleteRows="False"
+                              AlternatingRowBackground="#F8F9FA"
+                              GridLinesVisibility="Horizontal" BorderThickness="0"/>
+                </Grid>
+            </hc:Card>
+
+            <!-- Bottom Action -->
+            <hc:Card Grid.Row="4" Padding="10">
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="导入到测试页面" Command="{Binding ImportDataCommand}"
+                            Style="{StaticResource BtnPrimary}" Padding="20,8"/>
+                    <TextBlock Text="  将采集数据导入到测试页面" VerticalAlignment="Center"
+                               Foreground="#7F8C8D" FontSize="12"/>
+                </StackPanel>
+            </hc:Card>
+        </Grid>
+
+        <!-- Status Log -->
+        <hc:Card Grid.Column="1" Grid.Row="1" Margin="0,10,0,0" Padding="10">
+            <TextBox Text="{Binding LogText, Mode=OneWay}" IsReadOnly="True"
+                     TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                     MaxHeight="80" FontSize="11" Background="#FAFAFA"
+                     BorderThickness="0"/>
+        </hc:Card>
+    </Grid>
+</Window>

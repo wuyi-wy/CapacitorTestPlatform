@@ -1,0 +1,5 @@
+<Window x:Class="CapacitorTestPlatform.UI.Views.DeviceSelectDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Deprecated" Height="100" Width="200" Visibility="Collapsed">
+</Window>

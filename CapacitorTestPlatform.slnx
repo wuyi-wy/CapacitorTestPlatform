@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CapacitorTestPlatform.Core/CapacitorTestPlatform.Core.csproj" />
+    <Project Path="src/CapacitorTestPlatform.Data/CapacitorTestPlatform.Data.csproj" />
+    <Project Path="src/CapacitorTestPlatform.Devices/CapacitorTestPlatform.Devices.csproj" />
+    <Project Path="src/CapacitorTestPlatform.Services/CapacitorTestPlatform.Services.csproj" />
+    <Project Path="src/CapacitorTestPlatform.UI/CapacitorTestPlatform.UI.csproj" />
+  </Folder>
+</Solution>
