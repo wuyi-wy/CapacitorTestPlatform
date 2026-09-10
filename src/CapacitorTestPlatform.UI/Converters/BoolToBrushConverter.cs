@@ -26,6 +26,24 @@ public class BoolToBrushConverter : IValueConverter
 }
 
 /// <summary>
+/// 取反布尔值转换器，true → false，false → true。
+/// </summary>
+public class InvertBoolConverter : IValueConverter
+{
+    /// <summary>将布尔值取反。</summary>
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        return value is true ? false : true;
+    }
+
+    /// <summary>反向转换同样取反。</summary>
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        return value is true ? false : true;
+    }
+}
+
+/// <summary>
 /// 反向布尔值转可见性转换器，true 为 Collapsed，false 为 Visible。
 /// </summary>
 public class InverseBoolToVisibilityConverter : IValueConverter

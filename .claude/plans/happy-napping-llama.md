@@ -1,77 +1,98 @@
-# 本地数据库表名/字段重命名 + 代码注释
+# testItems → 设备推荐 → 动态数据列 实施方案
 
 ## Context
 
-本地 SQLite 4 张表（TBL_PLANCACHE、TBL_CHECKDATA、TBL_DEVICE_CONFIG、TBL_CONNECTION_LOG）及其字段全部使用大写下划线命名（如 `PLAN_CODE`、`DEVICE_ID`），不符合 C# PascalCase 规范。同时发现 **Dapper 映射 bug**：`SELECT *` 返回的大写列名（`PLAN_CODE`）无法映射到 C# 属性（`PlanNo`），因为 Dapper 不做下划线去除。此外 `PlanInfo` 模型缺少 TBL_PLANCACHE 的多个字段（Lot、DeviceId 等），导致 INSERT 时大部分值为 null。
+当前系统存在3个断层：
+1. DevicePanelWindow 不知道当前测试的是哪个 testItem，无法推荐设备
+2. 数据列由设备驱动的 OutputFields 决定（如 "LC"、"IR"），不是模板中的友好列名（如 "C(μF)"、"绝缘电阻(MΩ)"）
+3. PlanInfo 的规格标准（标称值、上限、下限）没有传递到测试页面用于判定
 
-远程 SQL Server 表（`apl_contract_plan`、`TestData` 等）**不修改**。
+## 改动概览
 
----
+### 1. 传递 testItem 和 PlanInfo 到 DevicePanelWindow
 
-## 改动范围
+**TestPageViewModel.cs**
+- 保留完整 `PlanInfo` 对象（新增 `_currentPlan` 字段）
+- `AcquireData` 事件传递 `testItem` 和 `plan` 给 View
 
-### 1. 表名重命名
+**TestPageView.xaml.cs**
+- `OnRequestDeviceSelect` 创建 DevicePanelWindow 时传入 `testItem` 和 `plan`
 
-| 旧表名 | 新表名 |
-|--------|--------|
-| TBL_PLANCACHE | PlanCache |
-| TBL_CHECKDATA | CheckData |
-| TBL_DEVICE_CONFIG | DeviceConfig |
-| TBL_CONNECTION_LOG | ConnectionLog |
+**DevicePanelViewModel.cs**
+- 构造函数新增 `string testItem` 和 `PlanInfo plan` 参数
+- 存储 `_testItem` 和 `_plan` 用于推荐和判定
 
-### 2. 字段重命名（以 CheckData 为例）
+### 2. testItem 推荐设备映射
 
-| 旧字段 | 新字段 | C# 属性 |
-|--------|--------|---------|
-| ID | Id | Id |
-| PLAN_CODE | PlanNo | PlanNo |
-| LOT | Lot | Lot |
-| DEVICE_ID | DeviceId | DeviceId |
-| DEVICE_TYPE | DeviceType | DeviceType |
-| ITEM_NO | ItemNo | ItemNo |
-| SPEC_NAME | SpecName | SpecName |
-| CHECK_NAME | CheckName | CheckName |
-| CHECK_VALUE | CheckValue | CheckValue |
-| RESULT | Result | Result |
-| TEST_DT | TestTime | TestTime |
-| OPERATOR | Operator | Operator |
-| REMARK | Remark | Remark |
-| SYNC_STATUS | SyncStatus | SyncStatus |
+在 `DevicePanelViewModel` 中新增推荐逻辑：
 
-PlanCache、DeviceConfig、ConnectionLog 同理全部转 PascalCase。
+```csharp
+private static readonly Dictionary<string, string> TestItemDeviceMapping = new()
+{
+    ["电容量"] = "TH2817A",
+    ["损耗角正切值(tgδ)"] = "TH2817A",
+    ["损耗角正切"] = "TH2817A",
+    ["等效串联电阻(ESR)"] = "TH2832",
+    ["ESR"] = "TH2832",
+    ["阻抗"] = "TH2832",
+    ["绝缘外套的绝缘电阻"] = "TH2689",
+    ["漏电流"] = "TH2683A",
+    ["可靠性前性能实验"] = null,  // 不推荐，用户自选
+    ["可靠性后性能实验"] = null,  // 不推荐，用户自选
+};
+```
 
-### 3. 涉及文件
+`LoadProfiles()` 中：如果 testItem 有推荐设备，将推荐设备排在列表第一位并自动选中。
+
+### 3. 数据列根据设备 + testItem 动态确定
+
+**DeviceService.GetColumnsForTestItem()** 已有映射逻辑，需要激活使用。
+
+**DevicePanelViewModel.MeasureAsync()**
+- 测量前，根据 `_testItem` + 所选设备调用 `GetColumnsForTestItem` 获取列定义
+- 调用 `ResultTable.RegisterColumns(columns)` 预注册列名
+- 测量后，将设备返回的原始 Key 映射到模板列名
+
+**MockDriver / 真实驱动**
+- MeasureAsync 返回的 Key 统一改为模板列名（如 "C(μF)" 而非 "LC"）
+
+### 4. PlanInfo 规格标准传递
+
+**TestPageViewModel**
+- 保留 `_currentPlan`，从中读取 SpecMin/SpecMax/SpecValue 用于判定
+- 测试数据导入时，将规格标准附带到 TestDataTable 的列定义中
+
+**判定逻辑**
+- 采集值与 SpecMin/SpecMax 比较，自动生成 Result（PASS/FAIL）
+- 模板中的"判定标准"行由 PlanInfo 的规格字段填充
+
+## 涉及文件
 
 | 文件 | 改动 |
 |------|------|
-| `Data/Contexts/SQLiteContext.cs` | DDL 表名+字段+索引名，加注释 |
-| `Data/Repositories/PlanRepository.cs` | 6 条 SQL 语句，加注释 |
-| `Data/Repositories/TestRecordRepository.cs` | 7 条 SQL 语句，加注释 |
-| `Data/Repositories/TestHistoryRepository.cs` | 6 条 SQL 语句，加注释 |
-| `Core/Models/PlanInfo.cs` | 补齐缺失属性（Lot、DeviceId、ItemNo、SpecName、SpecValue、SpecMin、SpecMax、SpecUnit、CreateTime），加注释 |
-| `Core/Models/TestRecord.cs` | 属性名与新列名对齐确认，加注释 |
-| `Core/Interfaces/IPlanRepository.cs` | 加注释 |
-| `Core/Interfaces/ITestHistoryRepository.cs` | 加注释 |
-| `Core/Interfaces/ITestRecordRepository.cs` | 加注释 |
-| `CLAUDE.md` | 更新数据库表说明 |
+| `UI/ViewModels/TestPageViewModel.cs` | 保留完整 PlanInfo，传递 testItem+plan 给设备弹窗 |
+| `UI/Views/TestPageView.xaml.cs` | 传递 testItem+plan 给 DevicePanelWindow |
+| `UI/ViewModels/DevicePanelViewModel.cs` | 接收 testItem+plan，推荐设备逻辑，列名映射 |
+| `UI/Views/DevicePanelWindow.xaml.cs` | 构造函数接收 testItem+plan |
+| `Services/DeviceService.cs` | GetColumnsForTestItem 补充完整映射 |
+| `Devices/Drivers/MockDriver.cs` | MeasureAsync 返回模板列名 |
+| `Core/Models/DeviceParameterConfig.cs` | OutputFields 改为模板列名 |
+| `UI/Models/TestDataTable.cs` | RegisterColumns 支持列定义预注册 |
 
-### 4. 不改动的文件
+## 不改动
 
-- `RemotePlanRepository.cs` — 远程 SQL Server，表名不变
-- `RemoteReportRepository.cs` — 远程 SQL Server，表名不变
-- `SqlServerContext.cs` — 远程连接，无关
-- 所有 ViewModel / View / Service 文件 — 不直接写 SQL，无需改动
-
----
+- 远程表/本地表结构不变
+- PlanInfo 模型不变
+- 真实设备驱动暂不改（后续接真实设备时按模板列名输出）
+- CSV 导出逻辑不变
 
 ## 执行步骤
 
-1. 修改 `SQLiteContext.cs`：4 张表 DDL + 4 个索引，加中文注释
-2. 补齐 `PlanInfo.cs`：添加 Lot、DeviceId、ItemNo、SpecName、SpecValue、SpecMin、SpecMax、SpecUnit、CreateTime 属性
-3. 确认 `TestRecord.cs` 属性名与新列名一致，加注释
-4. 修改 `PlanRepository.cs`：6 条 SQL 替换表名/字段名，加注释
-5. 修改 `TestRecordRepository.cs`：7 条 SQL 替换，加注释
-6. 修改 `TestHistoryRepository.cs`：6 条 SQL 替换，加注释
-7. 修改3个 Interface 文件：加注释
-8. 更新 `CLAUDE.md` 数据库表说明
-9. `dotnet build` 验证编译通过
+1. DevicePanelViewModel — 接收 testItem+plan，添加推荐设备映射
+2. DevicePanelWindow — 构造函数签名更新
+3. TestPageViewModel — 保留 PlanInfo，传递 testItem+plan
+4. TestPageView — 传递参数给设备弹窗
+5. DeviceService — 完善 GetColumnsForTestItem 映射
+6. MockDriver — 返回模板列名
+7. DeviceParameterConfig — OutputFields 改为模板列名
+8. dotnet build 验证

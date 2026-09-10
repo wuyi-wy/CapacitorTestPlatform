@@ -41,6 +41,7 @@ public partial class BindableParameter : ObservableObject
 
 /// <summary>
 /// 设备面板 ViewModel，管理设备选择、串口连接、参数配置、数据采集和结果导入。
+/// 支持根据 testItem 推荐设备，用户可自由选择其他设备。
 /// </summary>
 public partial class DevicePanelViewModel : ObservableObject
 {
@@ -48,6 +49,57 @@ public partial class DevicePanelViewModel : ObservableObject
     private readonly ISerialPortService _serialPortService;
     private IDeviceDriver? _currentDriver;
     private MockDriver? _mockDriver;
+
+    /// <summary>当前测试的实验项目名称</summary>
+    private readonly string _testItem;
+
+    /// <summary>当前测试计划信息（含规格标准）</summary>
+    private readonly PlanInfo _plan;
+
+    /// <summary>
+    /// testItem → 推荐设备型号映射。
+    /// 可靠性前/后性能实验不推荐，用户自选。
+    /// </summary>
+    private static readonly Dictionary<string, string> TestItemDeviceMapping = new()
+    {
+        ["电容量"] = "TH2817A",
+        ["损耗角正切值(tgδ)"] = "TH2817A",
+        ["损耗角正切"] = "TH2817A",
+        ["等效串联电阻(ESR)"] = "TH2832",
+        ["ESR"] = "TH2832",
+        ["阻抗"] = "TH2832",
+        ["绝缘外套的绝缘电阻"] = "TH2689",
+        ["漏电流"] = "TH2683A",
+    };
+
+    /// <summary>
+    /// testItem → 模板数据列名映射（与 docs/数据模板.xlsx 一致）。
+    /// </summary>
+    public static readonly Dictionary<string, List<string>> TestItemColumnsMapping = new()
+    {
+        ["电容量"] = new() { "C(μF)", "频率(Hz)" },
+        ["损耗角正切值(tgδ)"] = new() { "损耗", "频率(Hz)" },
+        ["损耗角正切"] = new() { "损耗", "频率(Hz)" },
+        ["等效串联电阻(ESR)"] = new() { "ESR(MΩ)", "频率(Hz)" },
+        ["ESR"] = new() { "ESR(MΩ)", "频率(Hz)" },
+        ["阻抗"] = new() { "阻抗(MΩ)", "频率(Hz)" },
+        ["绝缘外套的绝缘电阻"] = new() { "绝缘电阻(MΩ)" },
+        ["漏电流"] = new() { "IL正向(μA)", "HL正向(S)", "IL反向(μA)", "HL反向(S)" },
+    };
+
+    /// <summary>
+    /// testItem → LCR 内层 Tab 显示名映射（LCR数字电桥专用）。
+    /// 其他设备不设置 SubTitle，直接用 Title。
+    /// </summary>
+    private static readonly Dictionary<string, string> TestItemSubTitleMapping = new()
+    {
+        ["电容量"] = "C(μF)",
+        ["损耗角正切值(tgδ)"] = "损耗",
+        ["损耗角正切"] = "损耗",
+        ["等效串联电阻(ESR)"] = "ESR(MΩ)",
+        ["ESR"] = "ESR(MΩ)",
+        ["阻抗"] = "阻抗(MΩ)",
+    };
 
     /// <summary>设备配置方案列表</summary>
     [ObservableProperty]
@@ -75,6 +127,10 @@ public partial class DevicePanelViewModel : ObservableObject
     /// <summary>可选波特率列表</summary>
     public ObservableCollection<int> BaudRates { get; } = new() { 9600, 19200, 38400, 57600, 115200 };
 
+    /// <summary>是否使用模拟连接（勾选时用 MockDriver，不勾选时走真实串口）</summary>
+    [ObservableProperty]
+    private bool _useMockConnection = true;
+
     /// <summary>设备是否已连接</summary>
     [ObservableProperty]
     private bool _isConnected;
@@ -99,7 +155,7 @@ public partial class DevicePanelViewModel : ObservableObject
     [ObservableProperty]
     private int _acquireCount = 1;
 
-    /// <summary>采集结果数据表</summary>
+    /// <summary>采集结果数据表（Title 用于在测试页面作为表格标签显示）</summary>
     public TestDataTable ResultTable { get; } = new();
 
     /// <summary>采集结果行集合（用于 DataGrid 绑定）</summary>
@@ -109,24 +165,62 @@ public partial class DevicePanelViewModel : ObservableObject
     public event EventHandler<TestDataTable>? DataImportRequested;
 
     /// <summary>
-    /// 初始化设备面板 ViewModel，注入设备工厂和串口服务，并加载端口和配置方案。
+    /// 初始化设备面板 ViewModel。
+    /// 根据 testItem 推荐设备并自动选中，用户可手动切换其他设备。
     /// </summary>
-    public DevicePanelViewModel(IDeviceFactory deviceFactory, ISerialPortService serialPortService)
+    /// <param name="deviceFactory">设备工厂</param>
+    /// <param name="serialPortService">串口服务</param>
+    /// <param name="testItem">当前测试的实验项目名称</param>
+    /// <param name="plan">当前测试计划信息（含规格标准）</param>
+    public DevicePanelViewModel(IDeviceFactory deviceFactory, ISerialPortService serialPortService,
+        string testItem, PlanInfo plan)
     {
         _deviceFactory = deviceFactory;
         _serialPortService = serialPortService;
+        _testItem = testItem;
+        _plan = plan;
+        ResultTable.Title = testItem;
+        // LCR 数字电桥设置 SubTitle（测量列名），其他设备 SubTitle 为空
+        if (TestItemSubTitleMapping.TryGetValue(testItem, out var subTitle))
+            ResultTable.SubTitle = subTitle;
         RefreshPorts();
         LoadProfiles();
     }
 
     /// <summary>
-    /// 加载所有设备配置方案到列表。
+    /// 加载设备配置方案，如果有推荐设备则排在第一位并自动选中。
+    /// 选中设备后同步设置 ResultTable 的 DeviceCategory。
     /// </summary>
     private void LoadProfiles()
     {
         DeviceProfiles.Clear();
-        foreach (var profile in DeviceConfigProfile.GetAllProfiles())
+        var allProfiles = DeviceConfigProfile.GetAllProfiles();
+
+        // 查找推荐设备型号
+        TestItemDeviceMapping.TryGetValue(_testItem, out var recommendedModel);
+
+        if (!string.IsNullOrEmpty(recommendedModel))
+        {
+            // 推荐设备排第一
+            var recommended = allProfiles.FirstOrDefault(p => p.DeviceModel == recommendedModel);
+            if (recommended != null)
+            {
+                DeviceProfiles.Add(recommended);
+                foreach (var p in allProfiles.Where(p => p.DeviceModel != recommendedModel))
+                    DeviceProfiles.Add(p);
+                SelectedProfile = recommended;
+                ResultTable.DeviceCategory = recommended.Category;
+                Log($"实验项目「{_testItem}」推荐设备: {recommended.DisplayName}");
+                return;
+            }
+        }
+
+        // 无推荐或推荐不存在，按原顺序加载
+        foreach (var profile in allProfiles)
             DeviceProfiles.Add(profile);
+
+        if (_testItem.Contains("可靠性"))
+            Log($"实验项目「{_testItem}」请自由选择设备");
     }
 
     /// <summary>
@@ -180,11 +274,12 @@ public partial class DevicePanelViewModel : ObservableObject
         }
 
         ResultTable.Clear();
+        ResultTable.DeviceCategory = value.Category;
         Log($"已选择: {value.DisplayName}");
     }
 
     /// <summary>
-    /// 连接命令，根据设备配置方案连接真实设备或模拟驱动。
+    /// 连接命令。勾选"模拟连接"时使用 MockDriver 按设备分类返回模板数据；取消勾选时尝试真实串口连接。
     /// </summary>
     [RelayCommand]
     private async Task ConnectAsync()
@@ -194,38 +289,40 @@ public partial class DevicePanelViewModel : ObservableObject
         ErrorMessage = "";
         try
         {
-            if (SelectedProfile.IsMock)
+            if (UseMockConnection)
             {
+                // 模拟连接：MockDriver 按设备分类返回不同格式的数据
                 _mockDriver = new MockDriver(_serialPortService);
                 _mockDriver.SetDeviceCategory(SelectedProfile.Category);
+                _mockDriver.SetTestItem(_testItem);
                 _mockDriver.StatusChanged += (s, msg) => Log(msg);
-                var success = await _mockDriver.ConnectAsync("MOCK", 9600);
+                var success = await _mockDriver.ConnectAsync(SelectedPort ?? "MOCK", SelectedBaudRate);
                 _currentDriver = _mockDriver;
 
                 IsConnected = success;
-                ConnectionStatus = success ? "已连接(模拟)" : "连接失败";
+                ConnectionStatus = success ? $"已连接(模拟 {SelectedProfile.DeviceModel})" : "连接失败";
                 StatusColor = success ? "#4CAF50" : "#F44336";
             }
             else
             {
-                _currentDriver = _deviceFactory.Create(SelectedProfile.DeviceModel);
-                if (_currentDriver == null)
-                {
-                    ShowError("无法创建设备驱动");
-                    return;
-                }
-
-                _currentDriver.StatusChanged += (s, msg) => Log(msg);
-
+                // 真实连接：通过设备工厂创建驱动，连接真实串口
                 if (string.IsNullOrEmpty(SelectedPort))
                 {
                     ShowError("请选择串口");
                     return;
                 }
 
+                _currentDriver = _deviceFactory.Create(SelectedProfile.DeviceModel);
+                if (_currentDriver == null)
+                {
+                    ShowError($"不支持的设备型号: {SelectedProfile.DeviceModel}");
+                    return;
+                }
+                _currentDriver.StatusChanged += (s, msg) => Log(msg);
+
                 var success = await _currentDriver.ConnectAsync(SelectedPort, SelectedBaudRate);
                 IsConnected = success;
-                ConnectionStatus = success ? "已连接" : "连接失败";
+                ConnectionStatus = success ? $"已连接 {SelectedProfile.DeviceModel}" : "连接失败";
                 StatusColor = success ? "#4CAF50" : "#F44336";
             }
         }
@@ -280,6 +377,7 @@ public partial class DevicePanelViewModel : ObservableObject
 
     /// <summary>
     /// 数据采集命令，按设定次数循环执行测量并将结果添加到结果表。
+    /// 列名由设备驱动返回，已通过 MockDriver.SetTestItem 映射为模板列名。
     /// </summary>
     [RelayCommand]
     private async Task MeasureAsync()
@@ -352,7 +450,6 @@ public partial class DevicePanelViewModel : ObservableObject
     /// <summary>
     /// 显示错误信息并记录到日志。
     /// </summary>
-    /// <param name="msg">错误消息</param>
     private void ShowError(string msg)
     {
         ErrorMessage = msg;
@@ -363,7 +460,6 @@ public partial class DevicePanelViewModel : ObservableObject
     /// <summary>
     /// 追加一行带时间戳的操作日志。
     /// </summary>
-    /// <param name="msg">日志消息</param>
     private void Log(string msg)
     {
         LogText += $"[{DateTime.Now:HH:mm:ss}] {msg}\n";

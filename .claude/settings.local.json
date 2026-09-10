@@ -18,7 +18,13 @@
       "Bash(dotnet run *)",
       "Bash(taskkill //F //IM CapacitorTestPlatform.UI.exe)",
       "Bash(dotnet clean *)",
-      "Bash(taskkill //F //PID 28136)"
+      "Bash(taskkill //F //PID 28136)",
+      "Bash(taskkill //PID 13004 //F)",
+      "Bash(python3 -c ' *)",
+      "Bash(py --version)",
+      "Bash(python -c \"import openpyxl; print\\('ok'\\)\")",
+      "Bash(python -m pip install openpyxl -q)",
+      "Bash(python -c ' *)"
     ]
   }
 }

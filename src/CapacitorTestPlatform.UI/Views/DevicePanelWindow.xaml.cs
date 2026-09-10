@@ -7,51 +7,53 @@ using System.Windows.Data;
 namespace CapacitorTestPlatform.UI.Views;
 
 /// <summary>
-/// 设备面板弹窗，用于选择设备型号、配置参数、连接串口并采集测试数据。
+/// 设备面板弹窗，提供设备连接、参数配置和数据采集功能。
+/// 接收 testItem 和 plan 参数以支持推荐设备和模板列名。
 /// </summary>
 public partial class DevicePanelWindow : Window
 {
-    /// <summary>设备面板视图模型</summary>
-    public DevicePanelViewModel ViewModel { get; }
-
-    /// <summary>用户确认导入后返回的测试数据表，未确认时为 null。</summary>
-    public TestDataTable? ImportedData { get; private set; }
-
     /// <summary>
-    /// 初始化设备面板弹窗，绑定 ViewModel、注册数据导入和列刷新事件。
+    /// 初始化设备面板弹窗。
     /// </summary>
-    /// <param name="viewModel">设备面板视图模型实例。</param>
+    /// <param name="viewModel">设备面板 ViewModel（已注入 testItem 和 plan）</param>
     public DevicePanelWindow(DevicePanelViewModel viewModel)
     {
         InitializeComponent();
-        ViewModel = viewModel;
-        DataContext = ViewModel;
+        DataContext = viewModel;
 
-        ViewModel.DataImportRequested += (s, data) =>
+        // 导入数据事件：将结果写入测试页面的表格后关闭弹窗
+        viewModel.DataImportRequested += (_, data) =>
         {
-            ImportedData = data;
+            this.Tag = data;   // 用 Tag 把采集结果带回去
             DialogResult = true;
             Close();
         };
 
-        // 监听数据变化，动态生成列
-        ViewModel.ResultRows.CollectionChanged += (s, e) =>
+        // 订阅采集结果行变更，自动刷新结果表格列
+        viewModel.ResultRows.CollectionChanged += (_, _) =>
         {
-            if (ViewModel.ResultRows.Count > 0)
-                UpdateResultColumns();
+            var columns = viewModel.ResultTable.GetColumnOrder();
+            if (ResultDataGrid.Columns.Count != columns.Count + 2)
+                BuildResultColumns(viewModel.ResultTable);
         };
     }
 
     /// <summary>
-    /// 根据当前列信息动态重建结果 DataGrid 的列定义（序号列 + 数据列）。
+    /// 采集结果 DataGrid 加载时生成初始列。
     /// </summary>
-    private void UpdateResultColumns()
+    private void ResultDataGrid_Loaded(object sender, RoutedEventArgs e)
     {
-        var columns = TestDataRow.GetColumnOrder();
-        if (columns.Count == 0 || ResultDataGrid == null) return;
+        if (DataContext is DevicePanelViewModel vm)
+            BuildResultColumns(vm.ResultTable);
+    }
 
-        // 只在列数变化时重建
-        if (ResultDataGrid.Columns.Count == columns.Count + 1) return;
+    /// <summary>
+    /// 为采集结果 DataGrid 动态生成列定义（序号列 + 数据列 + 删除按钮列）。
+    /// </summary>
+    private void BuildResultColumns(TestDataTable table)
+    {
+        var columns = table.GetColumnOrder();
+        if (columns.Count == 0) return;
 
         ResultDataGrid.Columns.Clear();
 
@@ -74,5 +76,18 @@ public partial class DevicePanelWindow : Window
                 Width = 110
             });
         }
+
+        // 删除按钮列
+        var deleteCol = new DataGridTemplateColumn { Header = "操作", Width = 60 };
+        var factory = new FrameworkElementFactory(typeof(Button));
+        factory.SetValue(Button.ContentProperty, "删除");
+        factory.SetValue(Button.ForegroundProperty, System.Windows.Media.Brushes.Red);
+        factory.SetValue(Button.BackgroundProperty, System.Windows.Media.Brushes.Transparent);
+        factory.SetValue(Button.BorderThicknessProperty, new Thickness(0));
+        factory.SetValue(Button.PaddingProperty, new Thickness(8, 2, 8, 2));
+        factory.SetBinding(Button.CommandProperty,
+            new Binding("DataContext.ClearResultsCommand") { Source = this });
+        deleteCol.CellTemplate = new DataTemplate { VisualTree = factory };
+        ResultDataGrid.Columns.Add(deleteCol);
     }
 }

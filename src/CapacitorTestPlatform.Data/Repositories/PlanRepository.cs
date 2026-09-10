@@ -38,8 +38,8 @@ public class PlanRepository : CapacitorTestPlatform.Core.Interfaces.IPlanReposit
     {
         using var conn = _context.CreateConnection();
         const string sql = @"INSERT INTO PlanCache
-            (PlanNo, Lot, Station, DeviceId, ItemNo, SpecName, SpecValue, SpecMin, SpecMax, SpecUnit)
-            VALUES (@PlanNo, @Lot, @Station, @DeviceId, @ItemNo, @SpecName, @SpecValue, @SpecMin, @SpecMax, @SpecUnit)";
+            (ContractNumber, SampleType, TestItems, InstrumentNumber, StatusName, Lot, DeviceId, ItemNo, SpecName, SpecValue, SpecMin, SpecMax, SpecUnit)
+            VALUES (@ContractNumber, @SampleType, @TestItems, @InstrumentNumber, @StatusName, @Lot, @DeviceId, @ItemNo, @SpecName, @SpecValue, @SpecMin, @SpecMax, @SpecUnit)";
         conn.Execute(sql, plans);
     }
 
@@ -57,12 +57,12 @@ public class PlanRepository : CapacitorTestPlatform.Core.Interfaces.IPlanReposit
         return conn.Query<string>("SELECT DISTINCT Lot FROM PlanCache ORDER BY Lot").ToList();
     }
 
-    /// <summary>按关键字模糊搜索计划（匹配计划号、批次号、规格名称）。</summary>
+    /// <summary>按关键字模糊搜索计划（匹配申请单号、批次号、规格名称）。</summary>
     public List<PlanInfo> Search(string keyword)
     {
         using var conn = _context.CreateConnection();
         return conn.Query<PlanInfo>(
-            "SELECT * FROM PlanCache WHERE PlanNo LIKE @K OR Lot LIKE @K OR SpecName LIKE @K",
+            "SELECT * FROM PlanCache WHERE ContractNumber LIKE @K OR Lot LIKE @K OR SpecName LIKE @K",
             new { K = $"%{keyword}%" }).ToList();
     }
 }

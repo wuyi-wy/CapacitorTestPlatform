@@ -43,11 +43,11 @@
                       GridLinesVisibility="Horizontal" BorderThickness="0">
 
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="计划编号" Binding="{Binding PlanNo}" Width="150"/>
-                    <DataGridTextColumn Header="产品型号" Binding="{Binding ProductModel}" Width="180"/>
+                    <DataGridTextColumn Header="申请单号" Binding="{Binding ContractNumber}" Width="150"/>
+                    <DataGridTextColumn Header="样品型号" Binding="{Binding SampleType}" Width="180"/>
                     <DataGridTextColumn Header="实验项目" Binding="{Binding TestItems}" Width="*"/>
-                    <DataGridTextColumn Header="台位" Binding="{Binding Station}" Width="120"/>
-                    <DataGridTextColumn Header="状态" Binding="{Binding Status}" Width="100">
+                    <DataGridTextColumn Header="工站" Binding="{Binding InstrumentNumber}" Width="120"/>
+                    <DataGridTextColumn Header="状态" Binding="{Binding StatusName}" Width="100">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
                                 <Setter Property="HorizontalAlignment" Value="Center"/>

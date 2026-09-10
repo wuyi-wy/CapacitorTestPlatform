@@ -86,6 +86,7 @@
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
@@ -95,12 +96,18 @@
                         <TextBlock Text="{Binding ConnectionStatus}" VerticalAlignment="Center" Margin="0,0,15,0" FontWeight="Bold"/>
                     </StackPanel>
 
-                    <TextBlock Grid.Column="1" Text="串口:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                    <ComboBox Grid.Column="2" Width="100" ItemsSource="{Binding AvailablePorts}"
-                              SelectedItem="{Binding SelectedPort}" Margin="0,0,10,0"/>
-                    <ComboBox Grid.Column="3" Width="90" ItemsSource="{Binding BaudRates}"
-                              SelectedItem="{Binding SelectedBaudRate}" Margin="0,0,10,0"/>
-                    <Button Grid.Column="4" Content="刷新" Command="{Binding RefreshPortsCommand}"
+                    <!-- 模拟连接勾选框 -->
+                    <CheckBox Grid.Column="1" Content="模拟连接" IsChecked="{Binding UseMockConnection}"
+                              VerticalAlignment="Center" Margin="0,0,12,0"/>
+
+                    <TextBlock Grid.Column="2" Text="串口:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                    <ComboBox Grid.Column="3" Width="100" ItemsSource="{Binding AvailablePorts}"
+                              SelectedItem="{Binding SelectedPort}" Margin="0,0,10,0"
+                              IsEnabled="{Binding UseMockConnection, Converter={StaticResource InvertBool}}"/>
+                    <ComboBox Grid.Column="4" Width="90" ItemsSource="{Binding BaudRates}"
+                              SelectedItem="{Binding SelectedBaudRate}" Margin="0,0,10,0"
+                              IsEnabled="{Binding UseMockConnection, Converter={StaticResource InvertBool}}"/>
+                    <Button Grid.Column="5" Content="刷新" Command="{Binding RefreshPortsCommand}"
                             Padding="10,5" Margin="0,0,10,0"/>
 
                     <StackPanel Grid.Column="6" Orientation="Horizontal">
@@ -160,7 +167,8 @@
                               AutoGenerateColumns="False" IsReadOnly="False"
                               CanUserAddRows="False" CanUserDeleteRows="False"
                               AlternatingRowBackground="#F8F9FA"
-                              GridLinesVisibility="Horizontal" BorderThickness="0"/>
+                              GridLinesVisibility="Horizontal" BorderThickness="0"
+                              Loaded="ResultDataGrid_Loaded"/>
                 </Grid>
             </hc:Card>
 

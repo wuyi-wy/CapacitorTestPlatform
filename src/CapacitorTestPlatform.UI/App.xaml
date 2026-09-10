@@ -12,6 +12,7 @@
 
             <conv:BoolToBrushConverter x:Key="BoolToBrushConverter"/>
             <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibilityConverter"/>
+            <conv:InvertBoolConverter x:Key="InvertBool"/>
             <conv:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
             <conv:StringToBrushConverter x:Key="StringToBrushConverter"/>
 

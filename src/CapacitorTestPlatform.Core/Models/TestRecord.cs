@@ -12,7 +12,7 @@ public class TestRecord
     /// <summary>主键自增ID</summary>
     public int Id { get; set; }
 
-    /// <summary>计划编号 / 合同号</summary>
+    /// <summary>计划编号 / 申请单号</summary>
     public string PlanNo { get; set; } = string.Empty;
 
     /// <summary>批次号</summary>

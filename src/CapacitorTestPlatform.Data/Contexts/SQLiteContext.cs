@@ -45,9 +45,12 @@ public class SQLiteContext
         // 计划缓存表 — 从远程拉取的检测计划保存在本地，供测试页面选择
         conn.Execute(@"
             CREATE TABLE IF NOT EXISTS PlanCache (
-                PlanNo TEXT,
+                ContractNumber TEXT,
+                SampleType TEXT,
+                TestItems TEXT,
+                InstrumentNumber TEXT,
+                StatusName TEXT,
                 Lot TEXT,
-                Station TEXT,
                 DeviceId TEXT,
                 ItemNo TEXT,
                 SpecName TEXT,

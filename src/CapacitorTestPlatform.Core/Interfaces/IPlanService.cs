@@ -7,8 +7,11 @@ namespace CapacitorTestPlatform.Core.Interfaces;
 /// </summary>
 public interface IPlanService
 {
-    /// <summary>获取计划列表（优先本地，本地为空时从远程拉取）</summary>
+    /// <summary>获取计划列表（本地数据）</summary>
     Task<List<PlanInfo>> GetPlansAsync();
+
+    /// <summary>从远程数据库拉取当前工站的计划并同步保存到本地，远程不可用时返回 null</summary>
+    Task<List<PlanInfo>?> FetchFromRemoteAsync();
 
     /// <summary>从远程导入指定批次号的计划到本地</summary>
     Task<int> ImportFromRemoteAsync(string lotNo);

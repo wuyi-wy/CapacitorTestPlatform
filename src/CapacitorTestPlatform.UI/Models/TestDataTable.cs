@@ -1,143 +1,147 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Runtime.CompilerServices;
 
 namespace CapacitorTestPlatform.UI.Models;
 
 /// <summary>
-/// 动态测试数据行 - 支持任意列的表格数据。
+/// 测试数据行，支持属性变更通知。
+/// 列注册由所属 TestDataTable 实例管理，不再使用静态全局状态。
 /// </summary>
 public class TestDataRow : INotifyPropertyChanged
 {
-    /// <summary>行数据存储（列名 → 值）</summary>
     private readonly Dictionary<string, string> _data = new();
-
-    /// <summary>全局列名有序列表（静态共享，按首次出现顺序排列）</summary>
-    private static readonly List<string> _columnOrder = new();
-
-    /// <summary>已注册的列名集合（用于去重判断）</summary>
-    private static readonly HashSet<string> _knownColumns = new();
-
-    /// <summary>属性变更通知事件</summary>
-    public event PropertyChangedEventHandler? PropertyChanged;
-
-    /// <summary>
-    /// 按列名索引读写数据，设置值时自动注册新列并触发属性变更通知。
-    /// </summary>
-    /// <param name="key">列名</param>
-    /// <returns>对应列的值，不存在时返回空字符串。</returns>
-    public string this[string key]
-    {
-        get => _data.TryGetValue(key, out var v) ? v : "";
-        set
-        {
-            _data[key] = value;
-            if (_knownColumns.Add(key))
-                _columnOrder.Add(key);
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(key));
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("Item[]"));
-        }
-    }
-
-    /// <summary>行序号，变更时触发通知以刷新 UI 显示。</summary>
     private int _seqNo;
+
+    /// <summary>所属数据表实例，写入新列时自动注册到该表</summary>
+    public TestDataTable? ParentTable { get; set; }
+
+    /// <summary>行序号，支持属性变更通知（删除行后自动重编号）</summary>
     public int SeqNo
     {
         get => _seqNo;
-        set
-        {
-            _seqNo = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(SeqNo)));
-        }
+        set { _seqNo = value; OnPropertyChanged(); }
     }
 
-    /// <summary>只读数据字典，供外部遍历。</summary>
+    /// <summary>所有数据的只读副本</summary>
     public IReadOnlyDictionary<string, string> Data => _data;
 
-    /// <summary>当前已知列名的有序列表。</summary>
-    public IReadOnlyList<string> ColumnOrder => _columnOrder;
-
-    /// <summary>
-    /// 批量设置行数据，每一项会通过索引器写入以触发列注册和通知。
-    /// </summary>
-    /// <param name="values">列名与值的字典。</param>
-    public void SetData(Dictionary<string, string> values)
+    /// <summary>索引器，按列名读写数据。写入未知列时自动注册到所属表格。</summary>
+    public string this[string key]
     {
-        foreach (var kv in values)
-            this[kv.Key] = kv.Value;
-    }
-
-    /// <summary>
-    /// 获取当前已知的所有列名（按首次出现顺序）。
-    /// </summary>
-    public static List<string> GetColumnOrder() => new(_columnOrder);
-
-    /// <summary>
-    /// 注册初始列顺序，用于预定义列的场景。
-    /// </summary>
-    /// <param name="columns">要注册的列名集合。</param>
-    public static void RegisterColumns(IEnumerable<string> columns)
-    {
-        foreach (var col in columns)
+        get => _data.GetValueOrDefault(key, "");
+        set
         {
-            if (_knownColumns.Add(col))
-                _columnOrder.Add(col);
+            _data[key] = value;
+            ParentTable?.RegisterColumn(key);
         }
     }
 
-    /// <summary>
-    /// 重置全局列信息，清空列顺序和已知列记录。
-    /// </summary>
-    public static void ResetColumns()
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    protected void OnPropertyChanged([CallerMemberName] string? name = null)
     {
-        _columnOrder.Clear();
-        _knownColumns.Clear();
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 }
 
 /// <summary>
-/// 测试数据表 - 管理所有行数据，支持动态列。
+/// 测试数据动态表格容器，管理列顺序和数据行。
+/// 每个实例独立维护自己的列注册状态，支持多表格并存。
 /// </summary>
 public class TestDataTable
 {
-    /// <summary>测试数据行集合，支持集合变更通知。</summary>
+    /// <summary>本表格的列名有序集合（实例级）</summary>
+    private readonly List<string> _columnOrder = new();
+
+    /// <summary>本表格已知列名集合（实例级，用于快速去重判断）</summary>
+    private readonly HashSet<string> _knownColumns = new();
+
+    /// <summary>表格标题（如 testItem 名称"电容量"）</summary>
+    public string Title { get; set; } = "数据";
+
+    /// <summary>子标题（LCR数字电桥专用：测量列名如"C(μF)"、"损耗"、"ESR(MΩ)"、"阻抗(MΩ)"，其他设备为空）</summary>
+    public string SubTitle { get; set; } = "";
+
+    /// <summary>设备分类（如"LCR数字电桥"、"漏电流测试仪"），用于外层 Tab 分组</summary>
+    public string DeviceCategory { get; set; } = "";
+
+    /// <summary>显示名称：有 SubTitle 时返回 SubTitle，否则返回 Title</summary>
+    public string DisplayName => string.IsNullOrEmpty(SubTitle) ? Title : SubTitle;
+
+    /// <summary>数据行集合</summary>
     public ObservableCollection<TestDataRow> Rows { get; } = new();
 
-    /// <summary>当前表格的列名列表。</summary>
-    public List<string> Columns { get; private set; } = new();
+    /// <summary>获取本表格的列名有序列表（只读副本）</summary>
+    public List<string> GetColumnOrder() => new(_columnOrder);
 
     /// <summary>
-    /// 添加一行数据，自动分配序号并刷新列信息。
+    /// 注册一个新列名到本表格。已存在的列名会被忽略。
     /// </summary>
-    /// <param name="data">列名与值的字典。</param>
-    public void AddRow(Dictionary<string, string> data)
+    /// <param name="column">要注册的列名</param>
+    public void RegisterColumn(string column)
     {
-        var row = new TestDataRow { SeqNo = Rows.Count + 1 };
-        row.SetData(data);
-        Rows.Add(row);
-
-        // 刷新列信息
-        Columns = TestDataRow.GetColumnOrder();
+        if (_knownColumns.Add(column))
+        {
+            _columnOrder.Add(column);
+        }
     }
 
     /// <summary>
-    /// 删除指定行并重新编号所有剩余行。
+    /// 批量预注册列名（保持传入顺序）。
     /// </summary>
-    /// <param name="row">要删除的数据行。</param>
+    /// <param name="columns">要注册的列名集合</param>
+    public void RegisterColumns(IEnumerable<string> columns)
+    {
+        foreach (var col in columns)
+            RegisterColumn(col);
+    }
+
+    /// <summary>
+    /// 向表格添加一行数据，自动注册新出现的列名。
+    /// </summary>
+    /// <param name="rowData">列名 → 值 字典</param>
+    public void AddRow(Dictionary<string, string> rowData)
+    {
+        var row = new TestDataRow { SeqNo = Rows.Count + 1, ParentTable = this };
+        foreach (var kv in rowData)
+            row[kv.Key] = kv.Value;
+        Rows.Add(row);
+    }
+
+    /// <summary>
+    /// 从表格中移除一行并重新编号后续行。
+    /// </summary>
+    /// <param name="row">要移除的数据行</param>
     public void RemoveRow(TestDataRow row)
     {
-        Rows.Remove(row);
-        // 重新编号
-        for (int i = 0; i < Rows.Count; i++)
+        var index = Rows.IndexOf(row);
+        if (index < 0) return;
+
+        Rows.RemoveAt(index);
+
+        // 重新编号后续行
+        for (int i = index; i < Rows.Count; i++)
             Rows[i].SeqNo = i + 1;
     }
 
     /// <summary>
-    /// 清空所有行数据并重置全局列信息。
+    /// 清空本表格所有行和列状态，不影响其他表格实例。
     /// </summary>
     public void Clear()
     {
         Rows.Clear();
-        TestDataRow.ResetColumns();
-        Columns = new();
+        _columnOrder.Clear();
+        _knownColumns.Clear();
+    }
+
+    /// <summary>
+    /// 检查本表格是否包含指定列名。
+    /// </summary>
+    /// <param name="columns">要检查的列名集合</param>
+    /// <returns>所有列名都已注册时返回 true</returns>
+    public bool HasColumns(IEnumerable<string> columns)
+    {
+        return columns.All(c => _knownColumns.Contains(c));
     }
 }

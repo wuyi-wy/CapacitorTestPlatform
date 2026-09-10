@@ -56,7 +56,7 @@ public partial class PlanImportViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 加载计划命令，从远程服务获取计划列表，失败时回退到模拟数据。
+    /// 加载计划命令：优先从远程拉取（同步保存到本地），连接异常时回退到本地/模拟数据，远程为空时提示当前台位没有测试中的单。
     /// </summary>
     [RelayCommand]
     private async Task LoadPlansAsync()
@@ -66,25 +66,49 @@ public partial class PlanImportViewModel : ObservableObject
 
         try
         {
-            var plans = await _planService.GetPlansAsync();
-            Plans.Clear();
-            foreach (var plan in plans)
-                Plans.Add(plan);
+            // 优先从远程 SQL Server 拉取当前工站的计划
+            var remotePlans = await _planService.FetchFromRemoteAsync();
 
-            if (Plans.Count == 0)
+            if (remotePlans != null)
             {
-                LoadMockPlans();
-                StatusMessage = $"远程数据库未连接，已加载 {Plans.Count} 条模拟计划";
+                // 远程连接成功
+                Plans.Clear();
+                foreach (var plan in remotePlans)
+                    Plans.Add(plan);
+
+                if (Plans.Count == 0)
+                {
+                    StatusMessage = "当前台位没有测试中的单";
+                }
+                else
+                {
+                    StatusMessage = $"已从远程加载 {Plans.Count} 条计划";
+                }
             }
             else
             {
-                StatusMessage = $"已加载 {Plans.Count} 条计划";
+                // 远程不可用，回退到本地数据
+                var localPlans = await _planService.GetPlansAsync();
+                Plans.Clear();
+                foreach (var plan in localPlans)
+                    Plans.Add(plan);
+
+                if (Plans.Count == 0)
+                {
+                    LoadMockPlans();
+                    StatusMessage = $"远程数据库未连接，已加载 {Plans.Count} 条模拟计划";
+                }
+                else
+                {
+                    StatusMessage = $"远程不可用，已加载 {Plans.Count} 条本地计划";
+                }
             }
         }
         catch (Exception ex)
         {
+            // 连接异常，显示模拟数据
             LoadMockPlans();
-            StatusMessage = $"加载失败({ex.Message})，已加载 {Plans.Count} 条模拟计划";
+            StatusMessage = $"远程连接异常({ex.Message})，已加载 {Plans.Count} 条模拟计划";
         }
         finally
         {
@@ -98,18 +122,32 @@ public partial class PlanImportViewModel : ObservableObject
     private void LoadMockPlans()
     {
         Plans.Clear();
+        // 模拟数据：每个实验项目拆分为独立记录（与远程拉取后的格式一致）
         var mockPlans = new List<PlanInfo>
         {
-            new PlanInfo { PlanNo = "JH2025001", ProductModel = "CL21-104J-100V", TestItems = "电容量;损耗角正切值(ESR)", Station = "电容性能台1#", Status = "测试中" },
-            new PlanInfo { PlanNo = "JH2025002", ProductModel = "CL21-224J-100V", TestItems = "电容量;绝缘外套的绝缘电阻", Station = "电容性能台1#", Status = "测试中" },
-            new PlanInfo { PlanNo = "JH2025003", ProductModel = "CL21-473J-250V", TestItems = "电容量;漏电流", Station = "电容性能台1#", Status = "录入中" },
-            new PlanInfo { PlanNo = "JH2025004", ProductModel = "CBB22-105J-400V", TestItems = "电容量;损耗角正切值(ESR);阻抗", Station = "电容性能台2#", Status = "测试中" },
-            new PlanInfo { PlanNo = "JH2025005", ProductModel = "CBB22-225J-400V", TestItems = "电容量;绝缘外套的绝缘电阻", Station = "电容性能台2#", Status = "测试中" },
-            new PlanInfo { PlanNo = "JH2025006", ProductModel = "CD110-1000uF-16V", TestItems = "电容量;漏电流;阻抗", Station = "电容性能台1#", Status = "测试中" },
-            new PlanInfo { PlanNo = "JH2025007", ProductModel = "CD110-470uF-25V", TestItems = "电容量;损耗角正切值(ESR);漏电流", Station = "电容性能台3#", Status = "录入中" },
-            new PlanInfo { PlanNo = "JH2025008", ProductModel = "CT7-101K-1KV", TestItems = "电容量;绝缘外套的绝缘电阻;极壳耐压", Station = "电容性能台3#", Status = "测试中" },
-            new PlanInfo { PlanNo = "JH2025009", ProductModel = "CT7-471K-1KV", TestItems = "电容量;绝缘外套的绝缘电阻", Station = "电容性能台1#", Status = "测试中" },
-            new PlanInfo { PlanNo = "JH2025010", ProductModel = "CL21-333J-400V", TestItems = "电容量;漏电流;极壳耐压", Station = "电容性能台2#", Status = "测试中" },
+            new PlanInfo { ContractNumber = "JH2025001", SampleType = "CL21-104J-100V", TestItems = "电容量", InstrumentNumber = "电容性能台1#", StatusName = "测试中" },
+            new PlanInfo { ContractNumber = "JH2025001", SampleType = "CL21-104J-100V", TestItems = "损耗角正切值(ESR)", InstrumentNumber = "电容性能台1#", StatusName = "测试中" },
+            new PlanInfo { ContractNumber = "JH2025002", SampleType = "CL21-224J-100V", TestItems = "电容量", InstrumentNumber = "电容性能台1#", StatusName = "测试中" },
+            new PlanInfo { ContractNumber = "JH2025002", SampleType = "CL21-224J-100V", TestItems = "绝缘外套的绝缘电阻", InstrumentNumber = "电容性能台1#", StatusName = "测试中" },
+            new PlanInfo { ContractNumber = "JH2025003", SampleType = "CL21-473J-250V", TestItems = "电容量", InstrumentNumber = "电容性能台1#", StatusName = "录入中" },
+            new PlanInfo { ContractNumber = "JH2025003", SampleType = "CL21-473J-250V", TestItems = "漏电流", InstrumentNumber = "电容性能台1#", StatusName = "录入中" },
+            new PlanInfo { ContractNumber = "JH2025004", SampleType = "CBB22-105J-400V", TestItems = "电容量", InstrumentNumber = "电容性能台2#", StatusName = "测试中" },
+            new PlanInfo { ContractNumber = "JH2025004", SampleType = "CBB22-105J-400V", TestItems = "损耗角正切值(ESR)", InstrumentNumber = "电容性能台2#", StatusName = "测试中" },
+            new PlanInfo { ContractNumber = "JH2025004", SampleType = "CBB22-105J-400V", TestItems = "阻抗", InstrumentNumber = "电容性能台2#", StatusName = "测试中" },
+            new PlanInfo { ContractNumber = "JH2025005", SampleType = "CBB22-225J-400V", TestItems = "电容量", InstrumentNumber = "电容性能台2#", StatusName = "测试中" },
+            new PlanInfo { ContractNumber = "JH2025005", SampleType = "CBB22-225J-400V", TestItems = "绝缘外套的绝缘电阻", InstrumentNumber = "电容性能台2#", StatusName = "测试中" },
+            new PlanInfo { ContractNumber = "JH2025006", SampleType = "CD110-1000uF-16V", TestItems = "电容量", InstrumentNumber = "电容性能台1#", StatusName = "测试中" },
+            new PlanInfo { ContractNumber = "JH2025006", SampleType = "CD110-1000uF-16V", TestItems = "漏电流", InstrumentNumber = "电容性能台1#", StatusName = "测试中" },
+            new PlanInfo { ContractNumber = "JH2025006", SampleType = "CD110-1000uF-16V", TestItems = "阻抗", InstrumentNumber = "电容性能台1#", StatusName = "测试中" },
+            new PlanInfo { ContractNumber = "JH2025008", SampleType = "CT7-101K-1KV", TestItems = "电容量", InstrumentNumber = "电容性能台3#", StatusName = "测试中" },
+            new PlanInfo { ContractNumber = "JH2025008", SampleType = "CT7-101K-1KV", TestItems = "绝缘外套的绝缘电阻", InstrumentNumber = "电容性能台3#", StatusName = "测试中" },
+            new PlanInfo { ContractNumber = "JH2025008", SampleType = "CT7-101K-1KV", TestItems = "极壳耐压", InstrumentNumber = "电容性能台3#", StatusName = "测试中" },
+            new PlanInfo { ContractNumber = "JH2025009", SampleType = "CT7-471K-1KV", TestItems = "电容量", InstrumentNumber = "电容性能台1#", StatusName = "测试中" },
+            new PlanInfo { ContractNumber = "JH2025009", SampleType = "CT7-471K-1KV", TestItems = "绝缘外套的绝缘电阻", InstrumentNumber = "电容性能台1#", StatusName = "测试中" },
+            new PlanInfo { ContractNumber = "JH2025010", SampleType = "CL21-333J-400V", TestItems = "电容量", InstrumentNumber = "电容性能台2#", StatusName = "测试中" },
+            new PlanInfo { ContractNumber = "JH2025010", SampleType = "CL21-333J-400V", TestItems = "漏电流", InstrumentNumber = "电容性能台2#", StatusName = "测试中" },
+            new PlanInfo { ContractNumber = "JH2025010", SampleType = "CL21-333J-400V", TestItems = "极壳耐压", InstrumentNumber = "电容性能台2#", StatusName = "测试中" },
+            new PlanInfo { ContractNumber = "JH2025010", SampleType = "CL21-333J-400V", TestItems = "可靠性前性能实验", InstrumentNumber = "电容性能台2#", StatusName = "测试中" },
         };
         foreach (var plan in mockPlans)
             Plans.Add(plan);
@@ -136,8 +174,8 @@ public partial class PlanImportViewModel : ObservableObject
         {
             LoadMockPlans();
             var filtered = Plans.Where(p =>
-                p.PlanNo.Contains(SearchKeyword, StringComparison.OrdinalIgnoreCase) ||
-                (p.ProductModel?.Contains(SearchKeyword, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
+                p.ContractNumber.Contains(SearchKeyword, StringComparison.OrdinalIgnoreCase) ||
+                (p.SampleType?.Contains(SearchKeyword, StringComparison.OrdinalIgnoreCase) ?? false)).ToList();
             Plans.Clear();
             foreach (var plan in filtered)
                 Plans.Add(plan);

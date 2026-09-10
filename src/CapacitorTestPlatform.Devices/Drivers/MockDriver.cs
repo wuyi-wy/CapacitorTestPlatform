@@ -5,6 +5,7 @@ namespace CapacitorTestPlatform.Devices.Drivers;
 
 /// <summary>
 /// Mock 驱动，开发调试用，模拟设备测量结果，无需真实硬件。
+/// 支持通过 SetTestItem 设置实验项目，返回对应的模板列名数据。
 /// </summary>
 public class MockDriver : DeviceDriverBase
 {
@@ -14,6 +15,8 @@ public class MockDriver : DeviceDriverBase
     private Dictionary<string, string> _currentParams = new();
     /// <summary>设备分类，决定返回哪类模拟数据</summary>
     private string _deviceCategory = "LCR";
+    /// <summary>当前实验项目名称，决定返回的模板列名</summary>
+    private string _testItem = "";
 
     /// <summary>设备型号标识</summary>
     public override string ModelName => "MOCK";
@@ -43,6 +46,15 @@ public class MockDriver : DeviceDriverBase
     public void SetDeviceCategory(string category)
     {
         _deviceCategory = category;
+    }
+
+    /// <summary>
+    /// 设置当前实验项目名称，MeasureAsync 根据此值返回对应的模板列名数据。
+    /// </summary>
+    /// <param name="testItem">实验项目名称（如"电容量"、"漏电流"等）</param>
+    public void SetTestItem(string testItem)
+    {
+        _testItem = testItem;
     }
 
     /// <summary>
@@ -83,14 +95,14 @@ public class MockDriver : DeviceDriverBase
     }
 
     /// <summary>
-    /// 模拟一次测量，根据设备分类返回对应的随机测试数据。
+    /// 模拟一次测量，根据 testItem 和设备分类返回对应的模板列名随机测试数据。
+    /// 列名与 docs/数据模板.xlsx 保持一致。
     /// </summary>
     /// <returns>包含随机模拟数据的测量结果</returns>
     public override async Task<DeviceTestResult> MeasureAsync()
     {
         await Task.Delay(300 + _random.Next(200));
 
-        var func = _currentParams.GetValueOrDefault("Function", "");
         var freq = _currentParams.GetValueOrDefault("Frequency", "120");
 
         Dictionary<string, object?> data;
@@ -109,8 +121,7 @@ public class MockDriver : DeviceDriverBase
         {
             data = new()
             {
-                ["LC(μF)"] = (_random.NextDouble() * 0.5 + 0.01).ToString("F6"),
-                ["IR(MΩ)"] = (_random.NextDouble() * 5000 + 500).ToString("F1"),
+                ["绝缘电阻(MΩ)"] = (_random.NextDouble() * 5000 + 500).ToString("F1"),
             };
         }
         else if (_deviceCategory == "极壳耐压")
@@ -124,18 +135,71 @@ public class MockDriver : DeviceDriverBase
                 ["结果"] = resultMap.GetValueOrDefault(result, result.ToString()),
             };
         }
-        else // LCR 数字电桥
+        else // LCR 数字电桥 — 根据 Function 和 testItem 返回对应的模板列名
         {
-            data = new()
-            {
-                ["C(μF)"] = (_random.NextDouble() * 900 + 800).ToString("F3"),
-                ["频率(Hz)"] = freq,
-                ["损耗(tgδ)"] = (_random.NextDouble() * 0.01 + 0.001).ToString("F6"),
-                ["ESR(MΩ)"] = (_random.NextDouble() * 0.1 + 0.01).ToString("F4"),
-                ["阻抗(MΩ)"] = (_random.NextDouble() * 50 + 5).ToString("F3"),
-            };
+            var func = _currentParams.GetValueOrDefault("Function", "CSD");
+            data = LcrMockData(func, freq);
         }
 
         return DeviceTestResult.Ok(data);
+    }
+
+    /// <summary>
+    /// 根据 LCR 设备的阻抗功能（Function）返回对应的模板列名模拟数据。
+    /// CPD/CSD → C(μF)+损耗; CSRS → C(μF)+ESR(MΩ); LSRS → ESR(MΩ); ZTD → 阻抗(MΩ)+损耗; ZTR/RX → 阻抗(MΩ)
+    /// </summary>
+    private Dictionary<string, object?> LcrMockData(string function, string freq)
+    {
+        return function.ToUpper() switch
+        {
+            // 并联/串联电容 + 损耗 D
+            "CPD" or "CSD" => new()
+            {
+                ["C(μF)"] = (_random.NextDouble() * 900 + 800).ToString("F3"),
+                ["损耗"] = (_random.NextDouble() * 0.01 + 0.001).ToString("F6"),
+                ["频率(Hz)"] = freq,
+            },
+            // 串联电容 + ESR (串联电阻 Rs)
+            "CSRS" => new()
+            {
+                ["C(μF)"] = (_random.NextDouble() * 900 + 800).ToString("F3"),
+                ["ESR(MΩ)"] = (_random.NextDouble() * 0.1 + 0.01).ToString("F4"),
+                ["频率(Hz)"] = freq,
+            },
+            // 串联电感 + 线圈电阻 Rs → 映射到 ESR(MΩ)
+            "LSRS" => new()
+            {
+                ["ESR(MΩ)"] = (_random.NextDouble() * 0.1 + 0.01).ToString("F4"),
+                ["频率(Hz)"] = freq,
+            },
+            // 并联电感 + Q 品质因数
+            "LPQ" => new()
+            {
+                ["ESR(MΩ)"] = (_random.NextDouble() * 0.1 + 0.01).ToString("F4"),
+                ["频率(Hz)"] = freq,
+            },
+            // 总阻抗 Z + 损耗 D
+            "ZTD" => new()
+            {
+                ["阻抗(MΩ)"] = (_random.NextDouble() * 50 + 5).ToString("F3"),
+                ["损耗"] = (_random.NextDouble() * 0.01 + 0.001).ToString("F6"),
+                ["频率(Hz)"] = freq,
+            },
+            // 总阻抗 Z + 交流电阻 R / 电阻 R + 电抗 X
+            "ZTR" or "RX" => new()
+            {
+                ["阻抗(MΩ)"] = (_random.NextDouble() * 50 + 5).ToString("F3"),
+                ["频率(Hz)"] = freq,
+            },
+            // 默认：返回全列
+            _ => new()
+            {
+                ["C(μF)"] = (_random.NextDouble() * 900 + 800).ToString("F3"),
+                ["损耗"] = (_random.NextDouble() * 0.01 + 0.001).ToString("F6"),
+                ["ESR(MΩ)"] = (_random.NextDouble() * 0.1 + 0.01).ToString("F4"),
+                ["阻抗(MΩ)"] = (_random.NextDouble() * 50 + 5).ToString("F3"),
+                ["频率(Hz)"] = freq,
+            },
+        };
     }
 }
