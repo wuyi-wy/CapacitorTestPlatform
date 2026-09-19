@@ -50,6 +50,17 @@ public partial class TestPageView : Page
     }
 
     /// <summary>
+    /// DataGrid DataContext 变化时重新生成列（TabControl 复用 DataGrid 实例，切换 Tab 时需要刷新列）。
+    /// </summary>
+    private void DataGrid_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (sender is DataGrid dataGrid && dataGrid.DataContext is TestDataTable table)
+        {
+            BuildColumns(dataGrid, table);
+        }
+    }
+
+    /// <summary>
     /// DataGrid 加载时动态生成列，并订阅行集合变更以自动刷新列。
     /// 支持两种 DataContext：TestDataTable（多表格模板）和 DeviceCategoryTab（单表格模板）。
     /// </summary>
@@ -123,5 +134,20 @@ public partial class TestPageView : Page
         factory.SetBinding(Button.CommandParameterProperty, new Binding());
         deleteCol.CellTemplate = new DataTemplate { VisualTree = factory };
         dataGrid.Columns.Add(deleteCol);
+    }
+
+    /// <summary>
+    /// 集中显示模式下每个 DataGrid 加载完成时，动态生成列并订阅数据变化。
+    /// </summary>
+    private void ConcentratedDataGrid_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is not DataGrid dataGrid) return;
+        if (dataGrid.DataContext is not Models.TestDataTable table) return;
+
+        // 避免重复绑定
+        if (dataGrid.Columns.Count > 0) return;
+
+        BuildColumns(dataGrid, table);
+        table.Rows.CollectionChanged += (_, _) => BuildColumns(dataGrid, table);
     }
 }

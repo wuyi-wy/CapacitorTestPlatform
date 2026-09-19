@@ -180,7 +180,8 @@ public partial class DevicePanelViewModel : ObservableObject
         _testItem = testItem;
         _plan = plan;
         ResultTable.Title = testItem;
-        // LCR 数字电桥设置 SubTitle（测量列名），其他设备 SubTitle 为空
+        // 非 LCR 设备设置 SubTitle 用于测试页面 Tab 显示
+        // LCR 设备在导入时按数据模板拆分，不需要 SubTitle
         if (TestItemSubTitleMapping.TryGetValue(testItem, out var subTitle))
             ResultTable.SubTitle = subTitle;
         RefreshPorts();

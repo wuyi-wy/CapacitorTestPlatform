@@ -24,7 +24,9 @@
       "Bash(py --version)",
       "Bash(python -c \"import openpyxl; print\\('ok'\\)\")",
       "Bash(python -m pip install openpyxl -q)",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "Bash(dotnet add *)",
+      "Read(//tmp/**)"
     ]
   }
 }

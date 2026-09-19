@@ -59,6 +59,10 @@ public partial class TestPageViewModel : ObservableObject
     [ObservableProperty]
     private DeviceCategoryTab? _activeDeviceTab;
 
+    /// <summary>是否为集中显示模式（false 为多选项卡模式）</summary>
+    [ObservableProperty]
+    private bool _isConcentratedMode;
+
     /// <summary>当前选中的数据表（内层 TabControl 绑定）</summary>
     [ObservableProperty]
     private TestDataTable? _activeTable;
@@ -110,21 +114,35 @@ public partial class TestPageViewModel : ObservableObject
         RequestDeviceSelect?.Invoke(this, (TestItem, _currentPlan));
     }
 
+    /// <summary>LCR 数据模板：每组列名对应一个内层 Tab</summary>
+    private static readonly List<List<string>> LcrTemplateColumns = new()
+    {
+        new() { "C(μF)", "频率(Hz)" },
+        new() { "损耗", "频率(Hz)" },
+        new() { "ESR(MΩ)", "频率(Hz)" },
+        new() { "阻抗(MΩ)", "频率(Hz)" },
+    };
+
+    /// <summary>模板列 → 内层 Tab 子标题映射</summary>
+    private static readonly Dictionary<string, string> TemplateSubTitleMap = new()
+    {
+        ["C(μF)"] = "C(μF)",
+        ["损耗"] = "损耗",
+        ["ESR(MΩ)"] = "ESR(MΩ)",
+        ["阻抗(MΩ)"] = "阻抗(MΩ)",
+    };
+
     /// <summary>
     /// 将设备采集的数据导入到测试页面。
-    /// 按设备分类（DeviceCategory）分组，同分类下按 Title（testItem）匹配：
-    /// - 匹配已有表格 → 追加数据
-    /// - 不匹配 → 创建新表格（LCR数字电桥下会有多个子表格）
-    /// - 新设备分类 → 创建新选项卡
+    /// - LCR 数字电桥：按数据模板拆分成多个子表格（C(μF)、损耗、ESR(MΩ)、阻抗(MΩ)）
+    /// - 非 LCR 设备：整体作为一个表格导入
     /// </summary>
-    /// <param name="deviceData">设备返回的测试数据表（含 Title 和 DeviceCategory）</param>
     public void ImportDeviceData(TestDataTable deviceData)
     {
         var category = deviceData.DeviceCategory;
         if (string.IsNullOrEmpty(category))
             category = "其他";
 
-        // 查找或创建设备分类选项卡
         var deviceTab = DeviceTabs.FirstOrDefault(t => t.Category == category);
         if (deviceTab == null)
         {
@@ -132,45 +150,110 @@ public partial class TestPageViewModel : ObservableObject
             DeviceTabs.Add(deviceTab);
         }
 
-        // 在该分类下查找匹配的数据表（同 DisplayName 且列兼容）
-        var incomingColumns = deviceData.GetColumnOrder();
-        TestDataTable? targetTable = null;
+        if (category == "LCR数字电桥")
+            ImportLcrData(deviceTab, deviceData);
+        else
+            ImportSingleTable(deviceTab, deviceData);
+
+        ActiveDeviceTab = deviceTab;
+    }
+
+    /// <summary>
+    /// LCR 数据导入：按模板拆分列到多个子表格。
+    /// 例如 CPD 返回 C(μF)+损耗+频率，拆分后：C(μF) 表和 损耗 表各一份数据。
+    /// 导入前清空目标表的旧数据，确保行数与源数据一致。
+    /// </summary>
+    private void ImportLcrData(DeviceCategoryTab deviceTab, TestDataTable source)
+    {
+        var sourceColumns = source.GetColumnOrder();
+        int imported = 0;
+
+        foreach (var templateCols in LcrTemplateColumns)
+        {
+            // 数据列（去掉频率）必须全部在源数据中才创建该子表格
+            var dataCols = templateCols.Where(c => c != "频率(Hz)").ToList();
+            if (!dataCols.All(c => sourceColumns.Contains(c)))
+                continue;
+
+            var subTitle = TemplateSubTitleMap.GetValueOrDefault(dataCols.First(), dataCols.First());
+
+            // 如果数据列（不含频率）全部为空，则跳过不创建
+            bool allEmpty = source.Rows.All(srcRow =>
+                dataCols.All(c => string.IsNullOrWhiteSpace(srcRow.Data.GetValueOrDefault(c, ""))));
+            if (allEmpty)
+                continue;
+
+            var target = deviceTab.Tables.FirstOrDefault(t => t.DisplayName == subTitle);
+            if (target == null)
+            {
+                target = new TestDataTable
+                {
+                    Title = source.Title,
+                    SubTitle = subTitle,
+                    DeviceCategory = "LCR数字电桥"
+                };
+                deviceTab.Tables.Add(target);
+            }
+
+            // 导入前清空旧数据，避免重复追加
+            target.Clear();
+
+            foreach (var srcRow in source.Rows)
+            {
+                // 跳过数据列（不含频率）全部为空的行
+                if (dataCols.All(c => string.IsNullOrWhiteSpace(srcRow.Data.GetValueOrDefault(c, ""))))
+                    continue;
+
+                var rowData = new Dictionary<string, string>();
+                foreach (var col in templateCols)
+                    rowData[col] = srcRow.Data.GetValueOrDefault(col, "");
+                target.AddRow(rowData);
+            }
+
+            imported = source.Rows.Count;
+            ActiveTable = target;
+        }
+
+        StatusMessage = $"已导入 {imported} 条数据到「LCR数字电桥」";
+    }
+
+    /// <summary>
+    /// 非 LCR 数据导入：整体作为一个表格。
+    /// </summary>
+    private void ImportSingleTable(DeviceCategoryTab deviceTab, TestDataTable source)
+    {
+        var incomingColumns = source.GetColumnOrder();
+        TestDataTable? target = null;
 
         foreach (var table in deviceTab.Tables)
         {
-            if (table.DisplayName == deviceData.DisplayName)
+            if (table.DisplayName == source.DisplayName)
             {
-                // 同名表格：检查列是否兼容
                 if (table.GetColumnOrder().Count == 0 ||
                     (table.HasColumns(incomingColumns) && table.GetColumnOrder().Count == incomingColumns.Count))
                 {
-                    targetTable = table;
+                    target = table;
                     break;
                 }
             }
         }
 
-        // 没有匹配的表格，创建新表格
-        if (targetTable == null)
+        if (target == null)
         {
-            targetTable = new TestDataTable
+            target = new TestDataTable
             {
-                Title = deviceData.Title,
-                SubTitle = deviceData.SubTitle,
-                DeviceCategory = category
+                Title = source.Title,
+                SubTitle = source.SubTitle,
+                DeviceCategory = source.DeviceCategory
             };
-            deviceTab.Tables.Add(targetTable);
+            deviceTab.Tables.Add(target);
         }
 
-        // 导入数据行
-        foreach (var row in deviceData.Rows)
-        {
-            targetTable.AddRow(row.Data.ToDictionary(kv => kv.Key, kv => kv.Value));
-        }
+        foreach (var row in source.Rows)
+            target.AddRow(row.Data.ToDictionary(kv => kv.Key, kv => kv.Value));
 
-        ActiveDeviceTab = deviceTab;
-        ActiveTable = targetTable;
-        StatusMessage = $"已导入 {deviceData.Rows.Count} 条数据到「{category} - {targetTable.Title}」";
+        ActiveTable = target;
+        StatusMessage = $"已导入 {source.Rows.Count} 条数据到「{target.DisplayName}」";
     }
 
     /// <summary>
@@ -186,8 +269,8 @@ public partial class TestPageViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 保存数据命令，将所有表格导出为 CSV 文件。
-    /// 按设备分类 → 表格名 分段输出。
+    /// 保存数据命令，将所有表格导出为格式化的 Excel 文件（匹配数据模板格式）。
+    /// 按设备分类分 Sheet，每个子表格纵向排列，含表头、数据行、判定标准行。
     /// </summary>
     [RelayCommand]
     private void SaveData()
@@ -200,59 +283,151 @@ public partial class TestPageViewModel : ObservableObject
 
         try
         {
-            var defaultName = $"测试数据_{PlanNo}_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+            var defaultName = $"测试数据_{PlanNo}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
 
             var dialog = new Microsoft.Win32.SaveFileDialog
             {
                 Title = "保存测试数据",
-                Filter = "CSV文件|*.csv|所有文件|*.*",
+                Filter = "Excel文件|*.xlsx|所有文件|*.*",
                 FileName = defaultName,
-                DefaultExt = ".csv"
+                DefaultExt = ".xlsx"
             };
 
             if (dialog.ShowDialog() != true) return;
 
-            var filePath = dialog.FileName;
-            var lines = new List<string>();
+            using var workbook = new ClosedXML.Excel.XLWorkbook();
 
             foreach (var deviceTab in DeviceTabs)
             {
+                var sheet = workbook.Worksheets.Add(deviceTab.Category);
+                sheet.Style.Font.FontName = "微软雅黑";
+                var row = 1;
+
                 foreach (var table in deviceTab.Tables)
                 {
                     if (table.Rows.Count == 0) continue;
 
-                    // 表格标题行：设备分类 - 显示名
-                    lines.Add($"【{deviceTab.Category} - {table.DisplayName}】");
+                    var columns = table.GetColumnOrder();
+                    var freqColIdx = columns.IndexOf("频率(Hz)");
+                    // 有频率列时多加一列（频率 C:D 合并显示）
+                    var lastCol = freqColIdx >= 0 ? 1 + columns.Count + 1 : 1 + columns.Count;
+                    var threshold = GetNumericThreshold(table.DisplayName);
 
                     // 表头
-                    var columns = table.GetColumnOrder();
-                    var headers = new List<string> { "序号" };
-                    headers.AddRange(columns);
-                    lines.Add(string.Join(",", headers));
+                    sheet.Cell(row, 1).Value = "序号";
+                    for (int c = 0; c < columns.Count; c++)
+                        sheet.Cell(row, c + 2).Value = columns[c];
+                    // 频率列合并 C:D
+                    if (freqColIdx >= 0)
+                        sheet.Range(row, freqColIdx + 2, row, lastCol).Merge();
+                    ApplyCenterBold(sheet.Range(row, 1, row, lastCol));
+                    ApplyThinBorder(sheet.Range(row, 1, row, lastCol));
+                    row++;
 
                     // 数据行
-                    foreach (var row in table.Rows)
+                    foreach (var dataRow in table.Rows)
                     {
-                        var values = new List<string> { row.SeqNo.ToString() };
-                        foreach (var col in columns)
-                            values.Add(row[col]);
-                        lines.Add(string.Join(",", values));
+                        sheet.Cell(row, 1).Value = dataRow.SeqNo;
+                        for (int c = 0; c < columns.Count; c++)
+                        {
+                            var val = dataRow[columns[c]];
+                            if (double.TryParse(val, out var numVal))
+                            {
+                                var cell = sheet.Cell(row, c + 2);
+                                cell.Value = numVal;
+                                if (threshold.HasValue && c != freqColIdx)
+                                {
+                                    var isLower = IsLowerLimit(table.DisplayName);
+                                    if (isLower ? numVal < threshold.Value : numVal > threshold.Value)
+                                        cell.Style.Font.FontColor = ClosedXML.Excel.XLColor.Red;
+                                    else if (isLower ? numVal > threshold.Value : numVal < threshold.Value)
+                                        cell.Style.Font.FontColor = ClosedXML.Excel.XLColor.Green;
+                                }
+                            }
+                            else
+                                sheet.Cell(row, c + 2).Value = val;
+                        }
+                        // 频率列合并
+                        if (freqColIdx >= 0)
+                            sheet.Range(row, freqColIdx + 2, row, lastCol).Merge();
+                        sheet.Range(row, 1, row, lastCol).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+                        ApplyThinBorder(sheet.Range(row, 1, row, lastCol));
+                        row++;
                     }
 
-                    lines.Add(""); // 空行分隔
+                    row++; // 空行
+
+                    // 判定标准区域（匹配数据模板格式）
+                    var pairs = GetCriteriaRows(table.DisplayName);
+                    if (pairs.Count > 0)
+                    {
+                        var cr = row; // criteria start row
+                        int criteriaRows;
+
+                        if (pairs.Count == 1)
+                        {
+                            // 单标准（损耗/ESR/阻抗/绝缘电阻）：2行，B:C合并
+                            //   Row0: A=判定标准, B=标准名 (merged B:C)
+                            //   Row1: A=空,       B=标准值 (merged B:C)
+                            criteriaRows = 2;
+                            sheet.Cell(cr, 1).Value = "判定标准";
+                            sheet.Cell(cr, 1).Style.Font.Bold = true;
+                            sheet.Cell(cr, 1).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+                            sheet.Range(cr, 1, cr + 1, 1).Merge();
+                            sheet.Cell(cr, 2).Value = pairs[0].Label;
+                            sheet.Range(cr, 2, cr, 3).Merge();
+                            sheet.Cell(cr + 1, 2).Value = pairs[0].Value;
+                            sheet.Range(cr + 1, 2, cr + 1, 3).Merge();
+                        }
+                        else
+                        {
+                            // 多标准（C(μF)/漏电流）：每对占2行
+                            // 偶数对在B列，奇数对在C列；第2对起用C:D列
+                            criteriaRows = pairs.Count * 2;
+                            sheet.Cell(cr, 1).Value = "判定标准";
+                            sheet.Cell(cr, 1).Style.Font.Bold = true;
+                            sheet.Cell(cr, 1).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+                            sheet.Range(cr, 1, cr + criteriaRows - 1, 1).Merge();
+
+                            for (int i = 0; i < pairs.Count; i++)
+                            {
+                                var (label, value) = pairs[i];
+                                int lr = cr + i * 2;
+                                if (i < 2)
+                                {
+                                    // 前2对：B=i*2+2, C=i*2+3
+                                    sheet.Cell(lr, i * 2 + 2).Value = label;
+                                    sheet.Cell(lr + 1, i * 2 + 2).Value = value;
+                                }
+                                else
+                                {
+                                    // 后续对：C=3, D=4 (lastCol)
+                                    sheet.Cell(lr, 3).Value = label;
+                                    sheet.Cell(lr + 1, lastCol).Value = value;
+                                }
+                            }
+                        }
+
+                        ApplyThinBorder(sheet.Range(cr, 1, cr + criteriaRows - 1, lastCol));
+                        row = cr + criteriaRows;
+                    }
+
+                    row += 2; // 空行间隔
                 }
+
+                sheet.Columns().AdjustToContents();
+                sheet.Rows().AdjustToContents();
             }
 
-            var utf8Bom = new System.Text.UTF8Encoding(true);
-            System.IO.File.WriteAllText(filePath, string.Join("\n", lines), utf8Bom);
+            workbook.SaveAs(dialog.FileName);
 
-            StatusMessage = $"已保存到: {filePath}";
+            StatusMessage = $"已保存到: {dialog.FileName}";
 
             try
             {
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                 {
-                    FileName = filePath,
+                    FileName = dialog.FileName,
                     UseShellExecute = true
                 });
             }
@@ -262,6 +437,54 @@ public partial class TestPageViewModel : ObservableObject
         {
             StatusMessage = $"保存失败: {ex.Message}";
         }
+    }
+
+    /// <summary>
+    /// 根据表格显示名获取判定标准行（当前使用固定值，后续可从计划信息中读取）。
+    /// 返回 (标准名, 标准值) 列表，每项占一行。
+    /// </summary>
+    private static List<(string Label, string Value)> GetCriteriaRows(string displayName) => displayName switch
+    {
+        "C(μF)" => [("标称值", "1000"), ("容量正偏差", "±20%"), ("容量上限", "1200"), ("容量下限", "800")],
+        "损耗" => [("损耗标准", "≤0.2")],
+        "ESR(MΩ)" => [("ESR标准", "≤0.50")],
+        "阻抗(MΩ)" => [("阻抗标准", "≤8")],
+        "IL正向(μA)" or "HL正向(S)" => [("漏电流标准", "≤2012"), ("漏电流标准", "≤2012")],
+        "IL反向(μA)" or "HL反向(S)" => [("漏电流标准", "≤2012"), ("漏电流标准", "≤2012")],
+        "LC(μF)" or "IR(MΩ)" => [("绝缘电阻判定值", "≥100")],
+        _ => []
+    };
+
+    /// <summary>
+    /// 获取判定标准的数值阈值（用于数据着色比对，当前使用固定值）。
+    /// </summary>
+    private static double? GetNumericThreshold(string displayName) => displayName switch
+    {
+        "C(μF)" => 1200,      // 容量上限
+        "损耗" => 0.2,
+        "ESR(MΩ)" => 0.50,
+        "阻抗(MΩ)" => 8,
+        "IL正向(μA)" or "IL反向(μA)" => 2012,
+        "LC(μF)" => 100,
+        "IR(MΩ)" => 100,
+        _ => null
+    };
+
+    /// <summary>
+    /// 是否为下限判定标准（值越大越好，低于阈值标红，高于标绿）。
+    /// </summary>
+    private static bool IsLowerLimit(string displayName) => displayName is "LC(μF)" or "IR(MΩ)";
+
+    private static void ApplyThinBorder(ClosedXML.Excel.IXLRange range)
+    {
+        range.Style.Border.OutsideBorder = ClosedXML.Excel.XLBorderStyleValues.Thin;
+        range.Style.Border.InsideBorder = ClosedXML.Excel.XLBorderStyleValues.Thin;
+    }
+
+    private static void ApplyCenterBold(ClosedXML.Excel.IXLRange range)
+    {
+        range.Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+        range.Style.Font.Bold = true;
     }
 
     /// <summary>
