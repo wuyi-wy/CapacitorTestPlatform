@@ -53,13 +53,20 @@
                     <DataGridTextColumn Header="结果" Binding="{Binding Result}" Width="70"/>
                     <DataGridTextColumn Header="测试时间" Binding="{Binding TestTime}" Width="150"/>
                     <DataGridTextColumn Header="操作员" Binding="{Binding Operator}" Width="80"/>
-                    <DataGridTemplateColumn Header="操作" Width="100">
+                    <DataGridTemplateColumn Header="操作" Width="140">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <Button Content="删除"
-                                        Command="{Binding DataContext.DeleteRecordCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                        CommandParameter="{Binding}"
-                                        Foreground="Red" Background="Transparent" BorderThickness="0" Padding="8,2"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="打开Excel"
+                                            Command="{Binding DataContext.OpenExcelCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                            CommandParameter="{Binding}"
+                                            Foreground="#2196F3" Background="Transparent" BorderThickness="0" Padding="8,2"
+                                            IsEnabled="{Binding ExcelPath, Converter={StaticResource NullToVisibilityConverter}}"/>
+                                    <Button Content="删除"
+                                            Command="{Binding DataContext.DeleteRecordCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                            CommandParameter="{Binding}"
+                                            Foreground="Red" Background="Transparent" BorderThickness="0" Padding="8,2"/>
+                                </StackPanel>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>

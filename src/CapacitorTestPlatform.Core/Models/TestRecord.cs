@@ -51,6 +51,9 @@ public class TestRecord
     /// <summary>同步状态：0=未同步，1=已同步到远程</summary>
     public int SyncStatus { get; set; }
 
+    /// <summary>导出的 Excel 文件路径（历史记录可据此打开文件）</summary>
+    public string ExcelPath { get; set; } = string.Empty;
+
     // ----- 以下为 UI 层临时属性，不写入 CheckData 表 -----
 
     /// <summary>试件编号（UI 层使用，通过 Remark 字段存储）</summary>

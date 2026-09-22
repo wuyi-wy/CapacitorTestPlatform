@@ -415,11 +415,37 @@ public partial class TestPageViewModel : ObservableObject
                     row += 2; // 空行间隔
                 }
 
-                sheet.Columns().AdjustToContents();
-                sheet.Rows().AdjustToContents();
+                AutoFitSheet(sheet);
             }
 
             workbook.SaveAs(dialog.FileName);
+
+            // 保存到本地数据库（一条汇总记录，关联 Excel 文件路径）
+            try
+            {
+                var records = new List<TestRecord>();
+                foreach (var deviceTab in DeviceTabs)
+                {
+                    foreach (var table in deviceTab.Tables)
+                    {
+                        if (table.Rows.Count == 0) continue;
+                        records.Add(new TestRecord
+                        {
+                            PlanNo = PlanNo,
+                            DeviceType = deviceTab.Category,
+                            CheckName = table.DisplayName,
+                            CheckValue = $"{table.Rows.Count}条",
+                            Result = "导出",
+                            TestTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                            Remark = SpecimenNumber,
+                            ExcelPath = dialog.FileName
+                        });
+                    }
+                }
+                if (records.Count > 0)
+                    _testService.SaveTestRecords(records);
+            }
+            catch { }
 
             StatusMessage = $"已保存到: {dialog.FileName}";
 
@@ -485,6 +511,51 @@ public partial class TestPageViewModel : ObservableObject
     {
         range.Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
         range.Style.Font.Bold = true;
+    }
+
+    /// <summary>
+    /// 手动自适应列宽和行高（ClosedXML 的 AdjustToContents 对合并单元格无效）。
+    /// 中文字符按2倍宽度计算。
+    /// </summary>
+    private static void AutoFitSheet(ClosedXML.Excel.IXLWorksheet sheet)
+    {
+        var usedRange = sheet.RangeUsed();
+        if (usedRange == null) return;
+
+        int lastRow = usedRange.LastRow().RowNumber();
+        int lastCol = usedRange.LastColumn().ColumnNumber();
+
+        // 计算每列最大字符宽度
+        var colWidths = new double[lastCol + 1];
+        for (int col = 1; col <= lastCol; col++)
+        {
+            double maxWidth = 4; // 最小宽度
+            for (int r = 1; r <= lastRow; r++)
+            {
+                var cell = sheet.Cell(r, col);
+                var text = cell.GetString();
+                if (string.IsNullOrEmpty(text)) continue;
+                // 中文字符按2倍宽度
+                double width = 0;
+                foreach (var ch in text)
+                    width += ch > 127 ? 2.1 : 1.0;
+                width += 2; // padding
+                if (width > maxWidth) maxWidth = width;
+            }
+            colWidths[col] = maxWidth;
+        }
+
+        // 应用列宽
+        for (int col = 1; col <= lastCol; col++)
+            sheet.Column(col).Width = colWidths[col];
+
+        // 行高自适应（基于字号）
+        for (int r = 1; r <= lastRow; r++)
+        {
+            var row = sheet.Row(r);
+            var fontSize = row.Style.Font.FontSize > 0 ? row.Style.Font.FontSize : sheet.Style.Font.FontSize > 0 ? sheet.Style.Font.FontSize : 11;
+            row.Height = fontSize * 1.8;
+        }
     }
 
     /// <summary>

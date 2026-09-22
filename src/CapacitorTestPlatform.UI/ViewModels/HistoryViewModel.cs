@@ -63,7 +63,7 @@ public partial class HistoryViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 加载记录命令，根据筛选条件查询检测历史，数据库为空时回退到模拟数据。
+    /// 加载记录命令，根据筛选条件查询检测历史。
     /// </summary>
     [RelayCommand]
     private async Task LoadRecordsAsync()
@@ -79,20 +79,13 @@ public partial class HistoryViewModel : ObservableObject
             foreach (var record in records)
                 Records.Add(record);
 
-            if (Records.Count == 0)
-            {
-                LoadMockRecords();
-                StatusMessage = $"数据库为空，已加载 {Records.Count} 条模拟记录";
-            }
-            else
-            {
-                StatusMessage = $"已加载 {Records.Count} 条记录";
-            }
+            StatusMessage = Records.Count > 0
+                ? $"已加载 {Records.Count} 条记录"
+                : "没有找到记录";
         }
         catch (Exception ex)
         {
-            LoadMockRecords();
-            StatusMessage = $"加载失败({ex.Message})，已加载 {Records.Count} 条模拟记录";
+            StatusMessage = $"加载失败: {ex.Message}";
         }
         finally
         {
@@ -148,6 +141,38 @@ public partial class HistoryViewModel : ObservableObject
         if (record == null) return;
         Records.Remove(record);
         StatusMessage = $"已删除记录 #{record.Id}";
+    }
+
+    /// <summary>
+    /// 打开 Excel 文件命令。
+    /// </summary>
+    [RelayCommand]
+    private void OpenExcel(TestRecord? record)
+    {
+        if (record == null || string.IsNullOrWhiteSpace(record.ExcelPath))
+        {
+            StatusMessage = "该记录没有关联的 Excel 文件";
+            return;
+        }
+
+        if (!System.IO.File.Exists(record.ExcelPath))
+        {
+            StatusMessage = $"文件不存在: {record.ExcelPath}";
+            return;
+        }
+
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = record.ExcelPath,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"打开失败: {ex.Message}";
+        }
     }
 
     /// <summary>

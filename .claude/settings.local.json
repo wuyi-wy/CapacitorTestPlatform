@@ -26,7 +26,16 @@
       "Bash(python -m pip install openpyxl -q)",
       "Bash(python -c ' *)",
       "Bash(dotnet add *)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(taskkill //F //IM \"CapacitorTestPlatform.UI.exe\")",
+      "Bash(cp \"D:/claude/xinyuan/CapacitorTestPlatform/.claude/skills/test-page-features.md\" \"D:/claude/xinyuan/CapacitorTestPlatform/docs/test-page-features.md\" && cp \"C:/Users/wooyee/.claude/projects/D--claude-xinyuan-CapacitorTestPlatform/memory/wpf-patterns.md\" \"D:/claude/xinyuan/CapacitorTestPlatform/docs/wpf-patterns.md\" && cp \"C:/Users/wooyee/.claude/projects/D--claude-xinyuan-CapacitorTestPlatform/memory/project-current-state.md\" \"D:/claude/xinyuan/CapacitorTestPlatform/docs/project-current-state.md\" && echo \"Done\")",
+      "Bash(python -c \"import docx; print\\('ok'\\)\")",
+      "Bash(pip install *)",
+      "Bash(cat)",
+      "Bash(python /tmp/gen_manual.py)",
+      "Bash(python \"D:/claude/xinyuan/CapacitorTestPlatform/docs/gen_manual.py\")",
+      "Bash(python -m pip show python-docx)",
+      "Bash(\"/d/Program Files/Python/python\" \"D:/claude/xinyuan/CapacitorTestPlatform/docs/gen_manual.py\")"
     ]
   }
 }

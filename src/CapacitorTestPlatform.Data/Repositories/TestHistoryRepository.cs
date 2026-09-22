@@ -25,12 +25,23 @@ public class TestHistoryRepository : CapacitorTestPlatform.Core.Interfaces.ITest
     public List<TestRecord> GetByPlanNo(string planNo, string? specimenNumber = null)
     {
         using var conn = _context.CreateConnection();
-        if (string.IsNullOrEmpty(specimenNumber))
-            return conn.Query<TestRecord>("SELECT * FROM CheckData WHERE PlanNo = @PlanNo ORDER BY Id",
-                new { PlanNo = planNo }).ToList();
+        if (string.IsNullOrEmpty(planNo))
+        {
+            if (string.IsNullOrEmpty(specimenNumber))
+                return conn.Query<TestRecord>("SELECT * FROM CheckData ORDER BY Id DESC LIMIT 1000").ToList();
+            else
+                return conn.Query<TestRecord>("SELECT * FROM CheckData WHERE Remark = @Specimen ORDER BY Id",
+                    new { Specimen = specimenNumber }).ToList();
+        }
         else
-            return conn.Query<TestRecord>("SELECT * FROM CheckData WHERE PlanNo = @PlanNo AND Remark = @Specimen ORDER BY Id",
-                new { PlanNo = planNo, Specimen = specimenNumber }).ToList();
+        {
+            if (string.IsNullOrEmpty(specimenNumber))
+                return conn.Query<TestRecord>("SELECT * FROM CheckData WHERE PlanNo = @PlanNo ORDER BY Id",
+                    new { PlanNo = planNo }).ToList();
+            else
+                return conn.Query<TestRecord>("SELECT * FROM CheckData WHERE PlanNo = @PlanNo AND Remark = @Specimen ORDER BY Id",
+                    new { PlanNo = planNo, Specimen = specimenNumber }).ToList();
+        }
     }
 
     /// <summary>按日期范围查询检测记录。</summary>

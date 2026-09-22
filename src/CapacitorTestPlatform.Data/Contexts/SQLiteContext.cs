@@ -77,8 +77,12 @@ public class SQLiteContext
                 TestTime TEXT DEFAULT (datetime('now','localtime')),
                 Operator TEXT,
                 Remark TEXT,
-                SyncStatus INTEGER DEFAULT 0
+                SyncStatus INTEGER DEFAULT 0,
+                ExcelPath TEXT DEFAULT ''
             )");
+
+        // 兼容旧数据库：如果 CheckData 表缺少 ExcelPath 列则自动添加
+        try { conn.Execute("ALTER TABLE CheckData ADD COLUMN ExcelPath TEXT DEFAULT ''"); } catch { }
 
         // 设备参数配置表 — 持久化各型号设备的测试参数（当前未启用，预留）
         conn.Execute(@"

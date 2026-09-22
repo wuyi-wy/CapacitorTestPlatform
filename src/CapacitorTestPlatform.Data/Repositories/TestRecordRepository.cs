@@ -26,9 +26,9 @@ public class TestRecordRepository
         using var conn = _context.CreateConnection();
         const string sql = @"
             INSERT INTO CheckData
-                (PlanNo, Lot, DeviceId, DeviceType, ItemNo, SpecName, CheckName, CheckValue, Result, TestTime, Operator, Remark)
+                (PlanNo, Lot, DeviceId, DeviceType, ItemNo, SpecName, CheckName, CheckValue, Result, TestTime, Operator, Remark, ExcelPath)
             VALUES
-                (@PlanNo, @Lot, @DeviceId, @DeviceType, @ItemNo, @SpecName, @CheckName, @CheckValue, @Result, @TestTime, @Operator, @Remark)";
+                (@PlanNo, @Lot, @DeviceId, @DeviceType, @ItemNo, @SpecName, @CheckName, @CheckValue, @Result, @TestTime, @Operator, @Remark, @ExcelPath)";
 
         conn.Execute(sql, records);
     }
